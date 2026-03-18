@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+asyncpg
+psycopg2-binary
+shapely
+httpx
+anthropic
