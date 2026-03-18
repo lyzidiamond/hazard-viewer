@@ -3,6 +3,7 @@ import json
 from datetime import datetime, timezone
 
 import anthropic
+from anthropic.types import TextBlock
 from fastapi import APIRouter, Query, HTTPException
 
 from db.connection import get_conn
@@ -50,6 +51,8 @@ Data:
         max_tokens=1024,
         messages=[{"role": "user", "content": prompt}],
     )
+    if not isinstance(message.content[0], TextBlock):
+        raise ValueError("Unexpected response type from Claude")
     return message.content[0].text
 
 

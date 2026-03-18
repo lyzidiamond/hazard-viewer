@@ -19,5 +19,6 @@ async def close_pool():
 
 @asynccontextmanager
 async def get_conn():
+    assert _pool is not None, "Database pool not initialized"
     async with _pool.acquire() as conn:
         yield conn
