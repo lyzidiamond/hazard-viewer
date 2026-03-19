@@ -44,14 +44,14 @@ def set_last_sync(conn, ts: str):
 async def fetch_fema_declarations(since: Optional[str]) -> list[dict]:
     records = []
     skip = 0
-    filters = ["incidentType eq 'Flood'"]
+    filters = []
     if since:
         filters.append(f"lastRefresh gt '{since}'")
 
     async with httpx.AsyncClient(timeout=30) as client:
         while True:
             params = {
-                "$filter": " and ".join(filters),
+                "$filter": " and ".join(filters) if filters else None,
                 "$top": PAGE_SIZE,
                 "$skip": skip,
                 "$orderby": "disasterNumber asc",
@@ -96,7 +96,7 @@ def build_programs(record: dict) -> list[str]:
 
 
 async def sync():
-    log.info("Starting FEMA flood declaration sync...")
+    log.info("Starting FEMA disaster declaration sync...")
     conn = get_db()
     last_sync = get_last_sync(conn)
     sync_start = datetime.now(timezone.utc).isoformat()
@@ -136,6 +136,7 @@ async def sync():
             record.get("state"),
             fips,
             record.get("designatedArea"),
+            record.get("incidentType"),
             parse_date(record.get("incidentBeginDate")),
             parse_date(record.get("incidentEndDate")),
             parse_date(record.get("declarationDate")),
@@ -157,23 +158,24 @@ async def sync():
             execute_values(
                 cur,
                 """
-                INSERT INTO flood_declarations (
+                INSERT INTO disaster_declarations (
                     disaster_number, state, county_fips, county_name,
-                    incident_begin_date, incident_end_date, declaration_date,
+                    incident_type, incident_begin_date, incident_end_date, declaration_date,
                     declaration_type, programs_declared, geom
                 ) VALUES %s
                 ON CONFLICT (disaster_number) DO UPDATE SET
+                    incident_type       = EXCLUDED.incident_type,
                     incident_begin_date = EXCLUDED.incident_begin_date,
                     incident_end_date   = EXCLUDED.incident_end_date,
                     declaration_type    = EXCLUDED.declaration_type,
                     programs_declared   = EXCLUDED.programs_declared,
                     updated_at          = NOW()
                 WHERE
-                    flood_declarations.incident_begin_date IS DISTINCT FROM EXCLUDED.incident_begin_date
-                    OR flood_declarations.incident_end_date IS DISTINCT FROM EXCLUDED.incident_end_date
+                    disaster_declarations.incident_begin_date IS DISTINCT FROM EXCLUDED.incident_begin_date
+                    OR disaster_declarations.incident_end_date IS DISTINCT FROM EXCLUDED.incident_end_date
                 """,
                 batch,
-                template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, ST_GeomFromText(%s, 4326))",
+                template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, ST_GeomFromText(%s, 4326))",
             )
         conn.commit()
         log.info(f"Upserted batch {i // BATCH_SIZE + 1}/{-(-len(rows) // BATCH_SIZE)}")

@@ -7,7 +7,7 @@ from anthropic.types import TextBlock
 from fastapi import APIRouter, Query, HTTPException
 
 from db.connection import get_conn
-from routes.floods import get_floods
+from routes.declarations import get_declarations
 from routes.zone import get_zone
 
 router = APIRouter()
@@ -38,10 +38,19 @@ def _build_trend(declarations: list[dict]) -> dict:
 
 # the prompt sent to Claude to generate the narrative
 async def _generate_narrative(context: dict) -> str:
-    prompt = f"""You are a flood risk analyst and information officer. Based on the following data, write a plain-English
-flood risk narrative for this location. Cover: the current flood zone designation and what it means
-practically, historical frequency and trend, the most significant events, nearby population context,
-and an overall risk characterization. Be factual and direct. 3-4 paragraphs. Return as semantic html. Return only valid HTML. No markdown, no code fences. Avoid using excessive bold and italics. Use <p> for paragraphs. Provide a title in an <h2>. Paragraphs should not be more than two sentences long. At the end provide links to the FEMA NFHL service for the flood zone and the OpenFEMA disaster declarations for this location. Use the DisasterDeclarationsSummaries endpoint. Make sure the query parameters in the URL are valid. Open these links in a new tab. Include a bulleted list at the top of the narrative, after the title, with the following items: number of federal disaster declarations, include dates as sub-items, flood risk profile description (e.g. "low flood risk profile"). Important: the flood zone designation applies to the specific clicked location, while the historical disaster declarations reflect a 100km radius around that point — make this distinction explicit in the narrative so the reader understands they are different scales. Try to be colloquial while still being professional.
+    prompt = f"""You are a natural hazard risk analyst and information officer. Based on the following data, write a plain-English
+natural hazard risk narrative for this location. The data includes all federal disaster declarations within 100km — not just floods.
+Cover: the current FEMA flood zone designation and what it means practically, the full spectrum of natural hazard history (floods,
+hurricanes, tornadoes, severe storms, etc.), historical frequency and trend, the most significant events, and an overall risk
+characterization. Be factual and direct. 3-4 paragraphs. Return as semantic html. Return only valid HTML. No markdown, no code fences.
+Avoid using excessive bold and italics. Use <p> for paragraphs. Provide a title in an <h2>. Paragraphs should not be more than two
+sentences long. At the end provide links to the FEMA NFHL service for the flood zone and the OpenFEMA disaster declarations for this
+location. Use the DisasterDeclarationsSummaries endpoint. Make sure the query parameters in the URL are valid. Open these links in a
+new tab. Include a bulleted list at the top of the narrative, after the title, with the following items: breakdown of declarations by
+hazard type, overall hazard risk profile (e.g. "moderate multi-hazard risk profile"). Important: the flood zone designation applies
+to the specific clicked location, while the historical disaster declarations reflect a 100km radius around that point — make this
+distinction explicit in the narrative so the reader understands they are different scales. Try to be colloquial while still being
+professional.
 
 Data:
 {json.dumps(context, indent=2, default=str)}"""
@@ -83,16 +92,23 @@ async def get_narrative(
         }
 
     # fetch fresh data
-    floods = await get_floods(lat=lat, lng=lng, radius=100)
+    declarations = await get_declarations(lat=lat, lng=lng, radius=100)
     zone = await get_zone(lat=lat, lng=lng)
+
+    # group declarations by incident type for richer narrative context
+    by_type = {}
+    for d in declarations:
+        t = d.get("incident_type") or "Unknown"
+        by_type.setdefault(t, []).append(d)
 
     context = {
         "location": {"lat": lat, "lng": lng},
         "flood_zone": zone["flood_zone"],
         "flood_zone_description": zone["description"],
-        "declaration_count": len(floods),
-        "declarations": floods,
-        "trend": _build_trend(floods),
+        "declaration_count": len(declarations),
+        "declarations_by_type": {t: len(v) for t, v in by_type.items()},
+        "declarations": declarations,
+        "trend": _build_trend(declarations),
     }
 
     narrative = await _generate_narrative(context)

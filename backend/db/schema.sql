@@ -11,12 +11,13 @@ CREATE TABLE IF NOT EXISTS counties (
 );
 CREATE INDEX IF NOT EXISTS counties_geom_idx ON counties USING GIST(geom);
 
--- Flood disaster declarations (synced nightly from OpenFEMA)
-CREATE TABLE IF NOT EXISTS flood_declarations (
+-- Disaster declarations (synced nightly from OpenFEMA)
+CREATE TABLE IF NOT EXISTS disaster_declarations (
     disaster_number     INTEGER PRIMARY KEY,
     state               TEXT NOT NULL,
     county_fips         CHAR(5),
     county_name         TEXT,
+    incident_type       TEXT,
     incident_begin_date DATE,
     incident_end_date   DATE,
     declaration_date    DATE,
@@ -26,8 +27,9 @@ CREATE TABLE IF NOT EXISTS flood_declarations (
     created_at          TIMESTAMPTZ DEFAULT NOW(),
     updated_at          TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS flood_declarations_geom_idx ON flood_declarations USING GIST(geom);
-CREATE INDEX IF NOT EXISTS flood_declarations_date_idx ON flood_declarations(incident_begin_date);
+CREATE INDEX IF NOT EXISTS disaster_declarations_geom_idx ON disaster_declarations USING GIST(geom);
+CREATE INDEX IF NOT EXISTS disaster_declarations_date_idx ON disaster_declarations(incident_begin_date);
+CREATE INDEX IF NOT EXISTS disaster_declarations_type_idx ON disaster_declarations(incident_type);
 
 -- Cached AI narratives (keyed by location hash)
 CREATE TABLE IF NOT EXISTS ai_narratives (

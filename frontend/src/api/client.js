@@ -6,8 +6,10 @@ async function apiFetch(path) {
   return resp.json();
 }
 
-export function getFloods(lat, lng, radius = 100) {
-  return apiFetch(`/api/floods?lat=${lat}&lng=${lng}&radius=${radius}`);
+export function getDeclarations(lat, lng, radius = 100, incident_type = null) {
+  const params = new URLSearchParams({ lat, lng, radius });
+  if (incident_type) params.set("incident_type", incident_type);
+  return apiFetch(`/api/declarations?${params}`);
 }
 
 export function getZone(lat, lng) {
