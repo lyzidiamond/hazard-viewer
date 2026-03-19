@@ -51,11 +51,12 @@ async def fetch_fema_declarations(since: Optional[str]) -> list[dict]:
     async with httpx.AsyncClient(timeout=30) as client:
         while True:
             params = {
-                "$filter": " and ".join(filters) if filters else None,
                 "$top": PAGE_SIZE,
                 "$skip": skip,
                 "$orderby": "disasterNumber asc",
             }
+            if filters:
+                params["$filter"] = " and ".join(filters)
             resp = await client.get(OPENFEMA_URL, params=params)
             resp.raise_for_status()
             data = resp.json()
