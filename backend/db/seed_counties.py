@@ -45,6 +45,10 @@ def fetch_gazetteer() -> dict[str, dict]:
         filename = next(n for n in zf.namelist() if n.endswith(".txt"))
         with zf.open(filename) as f:
             reader = csv.DictReader(io.TextIOWrapper(f, encoding="utf-8"), delimiter="\t")
+            # headers = reader.fieldnames
+            # log.info(f"Gazetteer columns: {headers}")
+            # normalize header whitespace
+            reader.fieldnames = [f.strip() for f in (reader.fieldnames or [])]
             counties = {}
             for row in reader:
                 # GEOID is the 5-digit FIPS code
