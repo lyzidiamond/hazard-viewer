@@ -26,13 +26,13 @@ export default function NarrativePanel({ lat, lng, narrative, loading, error, on
         </button>
       </div>
 
-      {loading && <p><em>Analyzing flood history...</em></p>}
+      {loading && <p><em>Analyzing natural hazard history...</em></p>}
 
       {error && <p style={{ color: "var(--pico-color-red-550)" }}>{error}</p>}
 
       {narrative && (
         <>
-          {narrative.flood_zone && (
+          {/* {narrative.flood_zone && (
             <div style={{
               display: "inline-block",
               padding: "4px 10px",
@@ -45,7 +45,7 @@ export default function NarrativePanel({ lat, lng, narrative, loading, error, on
             }}>
               Zone {narrative.flood_zone}
             </div>
-          )}
+          )} */}
           <div style={{ lineHeight: "1.6" }}
             dangerouslySetInnerHTML={{ __html: narrative.narrative }}
           />
@@ -58,8 +58,8 @@ export default function NarrativePanel({ lat, lng, narrative, loading, error, on
   );
 }
 
-function floodZoneColor(zone) {
-  if (zone.startsWith("A") || zone.startsWith("V")) return "#c0392b";
-  if (zone === "X") return "#27ae60";
-  return "#7f8c8d";
-}
+// function floodZoneColor(zone) {
+//   if (zone.startsWith("A") || zone.startsWith("V")) return "#c0392b";
+//   if (zone === "X") return "#27ae60";
+//   return "#7f8c8d";
+// }

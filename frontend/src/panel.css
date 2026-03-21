@@ -7,6 +7,8 @@
 .narrative-panel,
 .narrative-panel p,
 .narrative-panel h2,
+.narrative-panel h3,
+.narrative-panel h4,
 .narrative-panel small {
   font-size: revert;
 }

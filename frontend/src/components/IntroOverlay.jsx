@@ -24,11 +24,9 @@ export default function IntroOverlay({ onDismiss }) {
           gap: "16px",
         }}
       >
-        <h1 style={{ margin: 0, fontSize: "22px", color: "#333" }}>FloodReport</h1>
+        <h1 style={{ margin: 0, fontSize: "22px", color: "#333" }}>Hazard Navigator</h1>
         <p style={{ margin: 0, lineHeight: "1.6", color: "#333" }}>
-          Click anywhere on the map to see 70 years of federal flood disaster
-          history for that location — including the current FEMA flood zone
-          designation and an AI-generated risk narrative.
+          Click anywhere on the map to see a natural hazards risk assessment.
         </p>
         <button
           onClick={onDismiss}
