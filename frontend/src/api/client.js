@@ -19,3 +19,7 @@ export function getZone(lat, lng) {
 export function getNarrative(lat, lng) {
   return apiFetch(`/api/narrative?lat=${lat}&lng=${lng}`);
 }
+
+export function getCounties(lat, lng, radius = 100) {
+  return apiFetch(`/api/counties?lat=${lat}&lng=${lng}&radius=${radius}`);
+}

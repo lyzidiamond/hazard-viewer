@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from db.connection import init_pool, close_pool
-from routes import declarations, zone, narrative
+from routes import declarations, zone, narrative, counties
 
 
 @asynccontextmanager
@@ -26,6 +26,7 @@ app.add_middleware(
 app.include_router(declarations.router, prefix="/api")
 app.include_router(zone.router, prefix="/api")
 app.include_router(narrative.router, prefix="/api")
+app.include_router(counties.router, prefix="/api")
 
 
 @app.get("/health")

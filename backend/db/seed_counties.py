@@ -4,6 +4,7 @@ Seed the counties table from Census data.
 Sources:
   - Census Gazetteer (2023): county FIPS, name, state, and internal point lat/lng
   - Census API (2020 Decennial): county population
+  - Census Cartographic Boundary (2023): county polygon boundaries
 
 Run once after creating the schema:
   python db/seed_counties.py
@@ -11,6 +12,7 @@ Run once after creating the schema:
 
 import csv
 import io
+import json
 import logging
 import os
 import zipfile
@@ -30,6 +32,8 @@ CENSUS_POP_URL = (
     "https://api.census.gov/data/2020/dec/pl"
     "?get=NAME,P1_001N&for=county:*&in=state:*"
 )
+# 1:5m cartographic boundary from eric.clst.org — good balance of detail and file size for county display
+BOUNDARY_URL = "https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json"
 
 
 def fetch_gazetteer() -> dict[str, dict]:
@@ -85,7 +89,29 @@ def fetch_population() -> dict[str, int]:
     return population
 
 
-def seed(conn, counties: dict, population: dict):
+def fetch_boundaries() -> dict[str, str]:
+    """Download county boundary GeoJSON from eric.clst.org (sourced from 2010 Census cartographic boundary files).
+
+    Returns a dict keyed by 5-digit FIPS with GeoJSON geometry string.
+    """
+    log.info("Fetching county boundaries...")
+    resp = httpx.get(BOUNDARY_URL, timeout=120, follow_redirects=True)
+    resp.raise_for_status()
+
+    geojson = resp.json()
+
+    boundaries = {}
+    for feature in geojson["features"]:
+        # plotly dataset uses feature id as the 5-digit FIPS code
+        fips = str(feature["id"]).zfill(5)
+        # store geometry as a JSON string for ST_GeomFromGeoJSON insertion
+        boundaries[fips] = json.dumps(feature["geometry"])
+
+    log.info(f"Loaded boundaries for {len(boundaries)} counties")
+    return boundaries
+
+
+def seed(conn, counties: dict, population: dict, boundaries: dict):
     rows = []
     for fips, county in counties.items():
         rows.append((
@@ -95,22 +121,24 @@ def seed(conn, counties: dict, population: dict):
             population.get(fips),
             county["lng"],
             county["lat"],
+            boundaries.get(fips),
         ))
 
     with conn.cursor() as cur:
         execute_values(
             cur,
             """
-            INSERT INTO counties (fips, name, state, population, geom)
+            INSERT INTO counties (fips, name, state, population, geom, boundary)
             VALUES %s
             ON CONFLICT (fips) DO UPDATE SET
                 name       = EXCLUDED.name,
                 state      = EXCLUDED.state,
                 population = EXCLUDED.population,
-                geom       = EXCLUDED.geom
+                geom       = EXCLUDED.geom,
+                boundary   = EXCLUDED.boundary
             """,
             rows,
-            template="(%s, %s, %s, %s, ST_SetSRID(ST_MakePoint(%s, %s), 4326))",
+            template="(%s, %s, %s, %s, ST_SetSRID(ST_MakePoint(%s, %s), 4326), ST_GeomFromGeoJSON(%s))",
         )
     conn.commit()
     log.info(f"Seeded {len(rows)} counties")
@@ -120,15 +148,18 @@ def main():
     conn = psycopg2.connect(os.environ["DATABASE_URL"])
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) FROM counties")
-            count = cur.fetchone()[0]
+            # check specifically for boundary data — centroids alone aren't enough
+            cur.execute("SELECT COUNT(*) FROM counties WHERE boundary IS NOT NULL")
+            row = cur.fetchone()
+            count = row[0] if row else 0
         if count > 0:
-            log.info(f"Counties already seeded ({count} rows), skipping")
+            log.info(f"Counties already seeded with boundaries ({count} rows), skipping")
             return
 
         counties = fetch_gazetteer()
         population = fetch_population()
-        seed(conn, counties, population)
+        boundaries = fetch_boundaries()
+        seed(conn, counties, population, boundaries)
     finally:
         conn.close()
 
