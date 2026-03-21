@@ -7,13 +7,7 @@ from db.connection import get_conn
 router = APIRouter()
 
 
-@router.get("/declarations")
-async def get_declarations(
-    lat: float = Query(..., ge=-90, le=90),
-    lng: float = Query(..., ge=-180, le=180),
-    radius: int = Query(100, ge=1, le=500),
-    incident_type: Optional[str] = Query(None),
-):
+async def fetch_declarations(lat: float, lng: float, radius: int = 100, incident_type: Optional[str] = None) -> list[dict]:
     radius_m = radius * 1000 # convert radius from kilometers to meters for PostGIS query
 
     # query the database for disaster declarations based on the provided latitude, longitude, and radius
@@ -49,3 +43,13 @@ async def get_declarations(
         )
 
     return [dict(row) for row in rows] # convert asyncpg Record objects to regular dicts for JSON serialization
+
+
+@router.get("/declarations")
+async def get_declarations(
+    lat: float = Query(..., ge=-90, le=90),
+    lng: float = Query(..., ge=-180, le=180),
+    radius: int = Query(100, ge=1, le=500),
+    incident_type: Optional[str] = Query(None),
+):
+    return await fetch_declarations(lat, lng, radius, incident_type)

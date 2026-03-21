@@ -7,7 +7,7 @@ from anthropic.types import TextBlock
 from fastapi import APIRouter, Query, HTTPException
 
 from db.connection import get_conn
-from routes.declarations import get_declarations
+from routes.declarations import fetch_declarations
 from routes.zone import get_zone
 
 router = APIRouter()
@@ -92,7 +92,7 @@ async def get_narrative(
         }
 
     # fetch fresh data
-    declarations = await get_declarations(lat=lat, lng=lng, radius=100)
+    declarations = await fetch_declarations(lat=lat, lng=lng, radius=100)
     zone = await get_zone(lat=lat, lng=lng)
 
     # group declarations by incident type for richer narrative context
