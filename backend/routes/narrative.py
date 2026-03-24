@@ -46,24 +46,21 @@ async def _generate_narrative(context: dict) -> str:
 - At the top, provide a bulleted list with all disaster declarations for the 100km area, including: date and county name. Format should be "2023 - Alameda County, CA". Group these by hazard type: top level bullet for hazard type, sub-bullets for each declaration. Include maximum three per type in reverse chronological order. if there are more than three for that type, add a fourth bullet that says "# more declarations" where # is the remaining number of declarations.
 - Cover the full spectrum of natural hazard history (floods, hurricanes, tornadoes, severe storms, etc), historical frequency and trend, most significant events, and an overall risk characterization.
 - Be factual and direct. 3-4 paragraphs. Paragraphs should not be more than 2 sentences long.
-- Return as semantic HTML. Return only valid HTML. No Markdown, no code fences. Avoid using excessive bold and italics. Use <p> for paragraphs. Provide a title in an <h2>.
-- ONLY If the area is in the United States, do an assessment of the hazards in that area and determine a risk value: very low, low, moderate, high, or very high. Do not include this if the area is outside the United States. Include that in an <h3> underneath the title in the format: "General risk:" followed by the value. If the area has a high frequency of severe storms and floods, for example, you might characterize it as "high" or "very high". If it has a long history of natural disasters with significant impacts, that would also contribute to a higher risk characterization. Conversely, if the area has few declarations and they are mostly minor events, it might be characterized as "low" or "very low". Use your judgment to synthesize the data into an overall risk assessment. Return "high" and "very high" values with red text, "low" and "very low" values with green text, and "moderate" values with orange text.
-- At the end provide a link to the OpenFEMA endpoint you're using to pull hazard data from this specific location. Use the DisasterDeclarationSummaries endpoint. Make sure the query parameters in the URL are valid.
+- Return as semantic HTML. Your response must start directly with an HTML tag — do not wrap it in a code block, do not use backticks, do not use ```html. The very first character of your response must be <. Avoid using excessive bold and italics. Use <p> for paragraphs. Provide a title in an <h2>.
+- ONLY If the area is in the United States, do an assessment of the hazards in that area and determine a risk value: very low, low, moderate, high, or very high. Do not include this if the area is outside the United States. Include that in an <h3> underneath the title in the format: "General risk:" followed by the value starting with a capital letter (e.g., "High"). If the area has a high frequency of severe storms and floods, for example, you might characterize it as "high" or "very high". If it has a long history of natural disasters with significant impacts, that would also contribute to a higher risk characterization. Conversely, if the area has few declarations and they are mostly minor events, it might be characterized as "low" or "very low". Use your judgment to synthesize the data into an overall risk assessment. Return "high" and "very high" values with red text, "low" and "very low" values with green text, and "moderate" values with orange text.
+- At the end provide a link to the OpenFEMA endpoint you're using to pull hazard data from this specific location. Use the DisasterDeclarationSummaries endpoint. Make sure the query parameters in the URL are valid. The format should be: "Data source: [URL]". For example: "Data source: https://api.fema.gov/open/v2/DisasterDeclarationsSummaries?lat=37.77&lng=-122.42&radius=100". Do not include this link anywhere but the end of the narrative.
 
 Data:
 {json.dumps(context, indent=2, default=str)}"""
 
     message = await _anthropic.messages.create(
-        model="claude-haiku-4-5-20251001",
+        model="claude-sonnet-4-6", # claude sonnet is a more robust model so it takes longer, but is more consistent than haiku or other faster models
         max_tokens=1024,
-        messages=[
-            {"role": "user", "content": prompt},
-            {"role": "assistant", "content": "<"},
-        ],
+        messages=[{"role": "user", "content": prompt}],
     )
     if not isinstance(message.content[0], TextBlock):
         raise ValueError("Unexpected response type from Claude")
-    return "<" + message.content[0].text
+    return message.content[0].text
 
 
 @router.get("/narrative")
