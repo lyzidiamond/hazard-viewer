@@ -7,10 +7,10 @@ CREATE TABLE IF NOT EXISTS counties (
     name        TEXT NOT NULL,
     state       TEXT NOT NULL,
     population  INTEGER,
-    geom        GEOMETRY(Point, 4326) NOT NULL
+    geom        GEOMETRY(Point, 4326) NOT NULL,
+    boundary    GEOMETRY(Geometry, 4326)
 );
 CREATE INDEX IF NOT EXISTS counties_geom_idx ON counties USING GIST(geom);
-ALTER TABLE counties ADD COLUMN IF NOT EXISTS boundary GEOMETRY(Geometry, 4326);
 CREATE INDEX IF NOT EXISTS counties_boundary_idx ON counties USING GIST(boundary);
 
 -- Disaster declarations (synced nightly from OpenFEMA)
