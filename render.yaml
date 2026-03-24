@@ -26,7 +26,7 @@ services:
         fromService:
           name: hazardviewer-api
           type: web
-          property: host
+          property: hostport
 
   - type: cron
     name: hazardviewer-sync
