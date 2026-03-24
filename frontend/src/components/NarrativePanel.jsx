@@ -26,7 +26,7 @@ export default function NarrativePanel({ lat, lng, narrative, loading, error, on
         </button>
       </div>
 
-      {loading && <p><em>Analyzing natural hazard history...</em></p>}
+      {loading && <p><em>Analyzing natural hazard history. This may take a few moments.</em></p>}
 
       {error && <p style={{ color: "var(--pico-color-red-550)" }}>{error}</p>}
 

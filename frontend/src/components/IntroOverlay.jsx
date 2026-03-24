@@ -26,8 +26,11 @@ export default function IntroOverlay({ onDismiss }) {
         }}
       >
         <h1 style={{ margin: 0, fontSize: "22px", color: "#333" }}>Hazard Navigator</h1>
-        <p style={{ margin: 0, lineHeight: "1.6", color: "#333" }}>
-          Click anywhere on the map to see a natural hazards risk assessment.
+        <p style={{ margin: 0, lineHeight: "1.6", fontSize: "18px", color: "#333" }}>
+          Click anywhere on the map to see a natural hazards risk assessment. Data is based on historical FEMA disaster declarations and flood zone information.
+          </p>
+          <p style={{ margin: 0, lineHeight: "1.6", fontSize: "14px", color: "#333" }}>
+          Hazard reports are generated using AI, so results may be inaccurate or incomplete. Use for general reference only.
         </p>
         <button
           onClick={onDismiss}

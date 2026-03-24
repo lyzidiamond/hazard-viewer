@@ -31,8 +31,8 @@ export default function Map({ onMapClick }) {
         type: "fill",
         source: "county-boundaries",
         paint: {
-          "fill-color": "#da4545",
-          "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.25, 0.05],
+          "fill-color": ["case", ["boolean", ["get", "has_declarations"], false], "#da4545", "#888888"],
+          "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.25, 0.2],
         },
       });
 
@@ -41,7 +41,7 @@ export default function Map({ onMapClick }) {
         type: "line",
         source: "county-boundaries",
         paint: {
-          "line-color": "#da4545",
+          "line-color": ["case", ["boolean", ["get", "has_declarations"], false], "#da4545", "#888888"],
           "line-width": 1,
           "line-opacity": 0.4,
         },

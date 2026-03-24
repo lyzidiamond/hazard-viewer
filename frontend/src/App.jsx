@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Map from "./components/Map";
 import NarrativePanel from "./components/NarrativePanel";
 import IntroOverlay from "./components/IntroOverlay";
@@ -10,18 +10,26 @@ export default function App() {
   const [narrative, setNarrative] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const abortRef = useRef(null);
 
   async function handleMapClick(lat, lng) {
+    // cancel any in-flight request before starting a new one
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setSelection({ lat, lng });
     setNarrative(null);
     setError(null);
     setLoading(true);
 
     try {
-      const data = await getNarrative(lat, lng);
+      const data = await getNarrative(lat, lng, controller.signal);
       setNarrative(data);
     } catch (err) {
-      setError("Failed to load flood data for this location.");
+      if (err.name !== "AbortError") {
+        setError("Failed to load flood data for this location.");
+      }
     } finally {
       setLoading(false);
     }
