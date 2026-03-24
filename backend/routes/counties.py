@@ -24,9 +24,9 @@ async def get_counties(
                 c.name,
                 c.state,
                 ST_AsGeoJSON(c.boundary) AS geometry,
-                json_object_agg(d.incident_type, d.count) AS declarations_by_type
+                json_object_agg(d.incident_type, d.count) FILTER (WHERE d.incident_type IS NOT NULL) AS declarations_by_type
             FROM counties c
-            JOIN (
+            LEFT JOIN (
                 SELECT
                     county_fips,
                     incident_type,
@@ -42,6 +42,11 @@ async def get_counties(
                 GROUP BY county_fips, incident_type
             ) d ON c.fips = d.county_fips
             WHERE c.boundary IS NOT NULL
+            AND (
+                d.county_fips IS NOT NULL
+                OR ST_DWithin(c.geom::geography, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography, $3)
+                OR ST_Contains(c.boundary, ST_SetSRID(ST_MakePoint($2, $1), 4326))
+            )
             GROUP BY c.fips, c.name, c.state, c.boundary
             """,
             lat, lng, radius_m,
@@ -57,7 +62,8 @@ async def get_counties(
                 "fips": row["fips"],
                 "name": row["name"],
                 "state": row["state"],
-                "declarations_by_type": json.loads(row["declarations_by_type"]) if isinstance(row["declarations_by_type"], str) else dict(row["declarations_by_type"]),
+                "declarations_by_type": (json.loads(row["declarations_by_type"]) if isinstance(row["declarations_by_type"], str) else dict(row["declarations_by_type"])) if row["declarations_by_type"] else {},
+                "has_declarations": row["declarations_by_type"] is not None,
             },
         })
 

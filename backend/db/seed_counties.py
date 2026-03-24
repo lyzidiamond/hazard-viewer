@@ -3,8 +3,7 @@ Seed the counties table from Census data.
 
 Sources:
   - Census Gazetteer (2023): county FIPS, name, state, and internal point lat/lng
-  - Census API (2020 Decennial): county population
-  - Census Cartographic Boundary (2023): county polygon boundaries
+  - Plotly/Census county boundaries GeoJSON: county polygon boundaries
 
 Run once after creating the schema:
   python db/seed_counties.py
@@ -64,28 +63,8 @@ def fetch_gazetteer() -> dict[str, dict]:
     return counties
 
 
-def fetch_population() -> dict[str, int]:
-    """Fetch 2020 decennial population for all counties.
-
-    Returns a dict keyed by 5-digit FIPS with population count.
-    """
-    log.info("Fetching Census population data...")
-    resp = httpx.get(CENSUS_POP_URL, timeout=60)
-    resp.raise_for_status()
-
-    data = resp.json()
-    # first row is headers: [NAME, P1_001N, state, county]
-    population = {}
-    for row in data[1:]:
-        fips = row[2].zfill(2) + row[3].zfill(3)
-        population[fips] = int(row[1])
-
-    log.info(f"Loaded population for {len(population)} counties")
-    return population
-
-
 def fetch_boundaries() -> dict[str, str]:
-    """Download county boundary GeoJSON from eric.clst.org (sourced from 2010 Census cartographic boundary files).
+    """Download county boundary GeoJSON.
 
     Returns a dict keyed by 5-digit FIPS with GeoJSON geometry string.
     """
@@ -106,14 +85,14 @@ def fetch_boundaries() -> dict[str, str]:
     return boundaries
 
 
-def seed(conn, counties: dict, population: dict, boundaries: dict):
+# add to counties table
+def seed(conn, counties: dict, boundaries: dict):
     rows = []
     for fips, county in counties.items():
         rows.append((
             fips,
             county["name"],
             county["state"],
-            population.get(fips),
             county["lng"],
             county["lat"],
             boundaries.get(fips),
@@ -123,17 +102,16 @@ def seed(conn, counties: dict, population: dict, boundaries: dict):
         execute_values(
             cur,
             """
-            INSERT INTO counties (fips, name, state, population, geom, boundary)
+            INSERT INTO counties (fips, name, state, geom, boundary)
             VALUES %s
             ON CONFLICT (fips) DO UPDATE SET
-                name       = EXCLUDED.name,
-                state      = EXCLUDED.state,
-                population = EXCLUDED.population,
-                geom       = EXCLUDED.geom,
-                boundary   = EXCLUDED.boundary
+                name     = EXCLUDED.name,
+                state    = EXCLUDED.state,
+                geom     = EXCLUDED.geom,
+                boundary = EXCLUDED.boundary
             """,
             rows,
-            template="(%s, %s, %s, %s, ST_SetSRID(ST_MakePoint(%s, %s), 4326), ST_GeomFromGeoJSON(%s))",
+            template="(%s, %s, %s, ST_SetSRID(ST_MakePoint(%s, %s), 4326), ST_GeomFromGeoJSON(%s))",
         )
     conn.commit()
     log.info(f"Seeded {len(rows)} counties")
@@ -152,9 +130,8 @@ def main():
             return
 
         counties = fetch_gazetteer()
-        population = fetch_population()
         boundaries = fetch_boundaries()
-        seed(conn, counties, population, boundaries)
+        seed(conn, counties, boundaries)
     finally:
         conn.close()
 
