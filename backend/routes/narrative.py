@@ -1,10 +1,11 @@
+# Narrative route: returns the AI-generated narrative for the clicked location
 import hashlib
 import json
 from datetime import datetime, timezone
 
 import anthropic
 from anthropic.types import TextBlock
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query
 
 from db.connection import get_conn
 from routes.declarations import fetch_declarations
