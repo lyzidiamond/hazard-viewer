@@ -14,7 +14,7 @@ async def lifespan(app: FastAPI):
     await close_pool()
 
 
-app = FastAPI(title="FloodReport API", lifespan=lifespan)
+app = FastAPI(title="Hazard Viewer API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
