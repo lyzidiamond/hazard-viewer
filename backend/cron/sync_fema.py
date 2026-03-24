@@ -9,25 +9,28 @@ import psycopg2
 from psycopg2.extras import execute_values
 from shapely.geometry import Point
 
+# logging setup
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
+# info about FEMA API, how many records to fetch at once, etc.
 OPENFEMA_URL = "https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries"
 PAGE_SIZE = 1000
 BATCH_SIZE = 500
 
 
+# connect to db
 def get_db():
     return psycopg2.connect(os.environ["DATABASE_URL"])
 
-
+# get the value of the last sync timestamp from the database (in sync_state table)
 def get_last_sync(conn) -> Optional[str]:
     with conn.cursor() as cur:
         cur.execute("SELECT value FROM sync_state WHERE key = 'last_fema_sync'")
         row = cur.fetchone()
         return row[0] if row else None
 
-
+# set value of last sync after successful completion (in sync_state table)
 def set_last_sync(conn, ts: str):
     with conn.cursor() as cur:
         cur.execute(
@@ -40,7 +43,7 @@ def set_last_sync(conn, ts: str):
         )
     conn.commit()
 
-
+# function to get the FEMA declarations
 async def fetch_fema_declarations(since: Optional[str]) -> list[dict]:
     records = []
     skip = 0
@@ -48,6 +51,7 @@ async def fetch_fema_declarations(since: Optional[str]) -> list[dict]:
     if since:
         filters.append(f"lastRefresh gt '{since}'")
 
+    # fetch records, paginated
     async with httpx.AsyncClient(timeout=30) as client:
         while True:
             params = {
@@ -58,7 +62,7 @@ async def fetch_fema_declarations(since: Optional[str]) -> list[dict]:
             if filters:
                 params["$filter"] = " and ".join(filters)
             resp = await client.get(OPENFEMA_URL, params=params)
-            resp.raise_for_status()
+            resp.raise_for_status() # checks if response is 400 or 500
             data = resp.json()
             page = data.get("DisasterDeclarationsSummaries", [])
             records.extend(page)
@@ -69,7 +73,7 @@ async def fetch_fema_declarations(since: Optional[str]) -> list[dict]:
 
     return records
 
-
+# get county centroids by FIPS code -- takes FIPS code, queries counties table, returns a dict mapping (FIPS --> (lng, lat)). those coordinates then get used to build WKT geometry to get upserted
 def get_county_centroids(conn, fips_codes: list[str]) -> dict[str, tuple[float, float]]:
     if not fips_codes:
         return {}
@@ -80,11 +84,11 @@ def get_county_centroids(conn, fips_codes: list[str]) -> dict[str, tuple[float, 
         )
         return {row[0]: (row[1], row[2]) for row in cur.fetchall()}
 
-
+# parse date from FEMA declaration
 def parse_date(val: Optional[str]) -> Optional[str]:
     return val[:10] if val else None
 
-
+# type of program: IH (individuals and households), IA (Individual Assistance), PA (public assistance), HM (hazard mitigation)
 def build_programs(record: dict) -> list[str]:
     return [
         p for p in [
@@ -95,17 +99,18 @@ def build_programs(record: dict) -> list[str]:
         ] if p
     ]
 
-
+# the sync function
 async def sync():
     log.info("Starting FEMA disaster declaration sync...")
-    conn = get_db()
-    last_sync = get_last_sync(conn)
-    sync_start = datetime.now(timezone.utc).isoformat()
-    log.info(f"Last sync: {last_sync or 'never (full load)'}")
+    conn = get_db() # connect to db
+    last_sync = get_last_sync(conn) # set last_sync to response from get_last_sync
+    sync_start = datetime.now(timezone.utc).isoformat() # set sync_start to now
+    log.info(f"Last sync: {last_sync or 'never (full load)'}") # log the time of last sync
 
-    records = await fetch_fema_declarations(since=last_sync)
-    log.info(f"Fetched {len(records)} records from OpenFEMA")
+    records = await fetch_fema_declarations(since=last_sync) # call fetch_fema_declarations which returns a records array
+    log.info(f"Fetched {len(records)} records from OpenFEMA") # log how many records were synced
 
+    # if no new records, log and close connection
     if not records:
         log.info("No new records — sync complete")
         conn.close()
@@ -117,20 +122,21 @@ async def sync():
         for r in records
         if len(r.get("fipsStateCode", "") + r.get("fipsCountyCode", "")) == 5
     })
-    centroids = get_county_centroids(conn, fips_codes)
+    centroids = get_county_centroids(conn, fips_codes) # get county centroids
 
     # build rows for bulk upsert, track centroids separately for invalidation
     rows = []
     delta_centroids = set()
     for record in records:
         fips = record.get("fipsStateCode", "") + record.get("fipsCountyCode", "")
-        fips = fips if len(fips) == 5 else None
-        centroid = centroids.get(fips) if fips else None
+        fips = fips if len(fips) == 5 else None # make sure fips code is 5 digits
+        centroid = centroids.get(fips) if fips else None # get fips code from centroids
         lng, lat = centroid if centroid else (None, None)
-        geom_wkt = Point(lng, lat).wkt if lng is not None and lat is not None else None
+        geom_wkt = Point(lng, lat).wkt if lng is not None and lat is not None else None # convert lat/lng to shapely wkt
 
         if lng is not None and lat is not None:
-            delta_centroids.add((round(lng, 4), round(lat, 4)))
+            delta_centroids.add((round(lng, 4), round(lat, 4))) # check if centroid is within 1km of existing narrative, if so invalidate narrative
+
 
         rows.append((
             record.get("disasterNumber"),

@@ -1,3 +1,4 @@
+// overlay shown on load with instructions, dismissed on button click
 export default function IntroOverlay({ onDismiss }) {
   return (
     <div

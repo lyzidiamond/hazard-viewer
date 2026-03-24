@@ -93,6 +93,7 @@ async def get_narrative(
 
     # fetch fresh data
     declarations = await fetch_declarations(lat=lat, lng=lng, radius=100)
+    # get flood zone
     zone = await get_zone(lat=lat, lng=lng)
 
     # group declarations by incident type for richer narrative context
@@ -101,6 +102,7 @@ async def get_narrative(
         t = d.get("incident_type") or "Unknown"
         by_type.setdefault(t, []).append(d)
 
+    # create a context object to feed to the model when creating a narrative
     context = {
         "location": {"lat": lat, "lng": lng},
         "flood_zone": zone["flood_zone"],
@@ -113,7 +115,7 @@ async def get_narrative(
 
     narrative = await _generate_narrative(context)
 
-    # cache the result
+    # cache the result (add to database)
     async with get_conn() as conn:
         await conn.execute(
             """
@@ -139,7 +141,7 @@ async def get_narrative(
         "cached": False,
     }
 
-
+# invalidate narrative. called if new disaster declarations are available within 100km
 @router.post("/narrative/invalidate")
 async def invalidate_narratives(lat: float, lng: float, radius_km: float = 100):
     radius_m = radius_km * 1000

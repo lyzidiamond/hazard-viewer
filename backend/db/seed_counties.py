@@ -24,15 +24,12 @@ from psycopg2.extras import execute_values
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
+# foreign key for FIPS code --> lat/lng
 GAZETTEER_URL = (
     "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/"
     "2023_Gazetteer/2023_Gaz_counties_national.zip"
 )
-CENSUS_POP_URL = (
-    "https://api.census.gov/data/2020/dec/pl"
-    "?get=NAME,P1_001N&for=county:*&in=state:*"
-)
-# 1:5m cartographic boundary from eric.clst.org — good balance of detail and file size for county display
+# county boundary polygons — used for choropleth display on the map
 BOUNDARY_URL = "https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json"
 
 
@@ -96,11 +93,11 @@ def fetch_boundaries() -> dict[str, str]:
     resp = httpx.get(BOUNDARY_URL, timeout=120, follow_redirects=True)
     resp.raise_for_status()
 
-    geojson = resp.json()
+    geojson = resp.json() # endpoint returns geojson
 
     boundaries = {}
     for feature in geojson["features"]:
-        # plotly dataset uses feature id as the 5-digit FIPS code
+        # dataset uses feature id as the 5-digit FIPS code
         fips = str(feature["id"]).zfill(5)
         # store geometry as a JSON string for ST_GeomFromGeoJSON insertion
         boundaries[fips] = json.dumps(feature["geometry"])
@@ -143,7 +140,7 @@ def seed(conn, counties: dict, population: dict, boundaries: dict):
 
 
 def main():
-    conn = psycopg2.connect(os.environ["DATABASE_URL"])
+    conn = psycopg2.connect(os.environ["DATABASE_URL"]) #connect to database URL
     try:
         with conn.cursor() as cur:
             # check specifically for boundary data — centroids alone aren't enough

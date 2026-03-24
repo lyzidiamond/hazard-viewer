@@ -1,3 +1,4 @@
+# Declarations route: gets FEMA disaster declarations within 100km of the clicked point
 from typing import Optional
 
 from fastapi import APIRouter, Query
@@ -13,7 +14,6 @@ async def fetch_declarations(lat: float, lng: float, radius: int = 100, incident
     # query the database for disaster declarations based on the provided latitude, longitude, and radius
     # "$1", "$2", etc. are placeholders for the parameters passed after the query string (asyncpg)
     # note: PostGIS queries use longitude first, then latitude (ST_MakePoint(lng, lat))
-    # incident_type filter is optional -- omit to return all hazard types
     async with get_conn() as conn:
         rows = await conn.fetch(
             """

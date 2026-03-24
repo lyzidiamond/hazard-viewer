@@ -1,3 +1,4 @@
+# internal route called by narrative.py to get flood zone. provides additional information for narrative generation
 import httpx
 from fastapi import APIRouter, Query, HTTPException
 
@@ -5,7 +6,6 @@ router = APIRouter()
 
 NFHL_URL = "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28/query"
 
-# todo: add more detailed descriptions for subtypes (e.g. coastal A zones, shaded X zones, etc.) in the frontend
 ZONE_DESCRIPTIONS = {
     "A":   "High risk — 1% annual flood chance (100-year flood zone), no detailed analysis",
     "AE":  "High risk — 1% annual flood chance, base flood elevations determined",
@@ -16,7 +16,7 @@ ZONE_DESCRIPTIONS = {
     "D":   "Undetermined risk — not studied",
 }
 
-# server acts as proxy to FEMA NFHL service to avoid CORS issues and hide API key (if needed in future)
+# server acts as proxy to FEMA NFHL service
 @router.get("/zone")
 async def get_zone(
     lat: float = Query(..., ge=-90, le=90),

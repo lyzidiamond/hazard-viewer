@@ -1,3 +1,4 @@
+# Counties route: queries database for interesecting counties and returns GeoJSON for frontend rendering with MapLibre
 import json
 
 from fastapi import APIRouter, Query
