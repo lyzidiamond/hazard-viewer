@@ -12,7 +12,6 @@ async def fetch_declarations(lat: float, lng: float, radius: int = 100, incident
     radius_m = radius * 1000 # convert radius from kilometers to meters for PostGIS query
 
     # query the database for disaster declarations based on the provided latitude, longitude, and radius
-    # "$1", "$2", etc. are placeholders for the parameters passed after the query string (asyncpg)
     # note: PostGIS queries use longitude first, then latitude (ST_MakePoint(lng, lat))
     async with get_conn() as conn:
         rows = await conn.fetch(

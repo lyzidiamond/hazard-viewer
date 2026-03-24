@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: floodreport-api
+    name: hazardviewer-api
     runtime: python
     rootDir: backend
     buildCommand: pip install -r requirements.txt
@@ -10,13 +10,13 @@ services:
     envVars:
       - key: DATABASE_URL
         fromDatabase:
-          name: floodreport-db
+          name: hazardviewer-db
           property: connectionString
       - key: ANTHROPIC_API_KEY
         sync: false
 
   - type: web
-    name: floodreport-frontend
+    name: hazardviewer-frontend
     runtime: static
     rootDir: frontend
     buildCommand: npm ci && npm run build
@@ -24,25 +24,25 @@ services:
     envVars:
       - key: VITE_API_URL
         fromService:
-          name: floodreport-api
+          name: hazardviewer-api
           type: web
           property: url
 
   - type: cron
-    name: floodreport-sync
+    name: hazardviewer-sync
     runtime: python
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    schedule: '0 2 * * *'
+    schedule: '0 2 * * *' # Every day at 2 AM
     startCommand: python cron/sync_fema.py
     envVars:
       - key: DATABASE_URL
         fromDatabase:
-          name: floodreport-db
+          name: hazardviewer-db
           property: connectionString
 
 databases:
-  - name: floodreport-db
-    databaseName: floodreport
+  - name: hazardviewer-db
+    databaseName: hazardviewer
     plan: free
     postgresMajorVersion: '18'
