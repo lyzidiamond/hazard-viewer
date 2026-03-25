@@ -2,7 +2,6 @@ const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 // throws error on non-200 responses
 async function apiFetch(path, signal) {
-  console.log(`Fetching ${path} from API ${API_URL}...`);
   const resp = await fetch(`${API_URL}${path}`, { signal });
   if (!resp.ok) throw new Error(`API error ${resp.status}: ${path}`);
   return resp.json();
