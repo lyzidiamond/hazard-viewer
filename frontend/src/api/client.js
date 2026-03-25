@@ -1,5 +1,5 @@
 const API_URL = import.meta.env.VITE_API_URL
-  ? `http://${import.meta.env.VITE_API_URL}`
+  ? `http://${import.meta.env.VITE_API_URL}:8000`
   : "http://localhost:8000";
 
 // throws error on non-200 responses
