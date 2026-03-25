@@ -23,10 +23,7 @@ services:
     staticPublishPath: ./dist
     envVars:
       - key: VITE_API_URL
-        fromService:
-          name: hazardviewer-api
-          type: web
-          property: host
+        sync: false
 
   - type: cron
     name: hazardviewer-sync
