@@ -32,20 +32,6 @@ export default function NarrativePanel({ lat, lng, narrative, loading, error, on
 
       {narrative && (
         <>
-          {/* {narrative.flood_zone && (
-            <div style={{
-              display: "inline-block",
-              padding: "4px 10px",
-              borderRadius: "4px",
-              background: floodZoneColor(narrative.flood_zone),
-              color: "white",
-              fontSize: "13px",
-              fontWeight: "bold",
-              alignSelf: "flex-start",
-            }}>
-              Zone {narrative.flood_zone}
-            </div>
-          )} */}
           <div style={{ lineHeight: "1.6" }}
             dangerouslySetInnerHTML={{ __html: narrative.narrative }}
           />
@@ -57,9 +43,3 @@ export default function NarrativePanel({ lat, lng, narrative, loading, error, on
     </div>
   );
 }
-
-// function floodZoneColor(zone) {
-//   if (zone.startsWith("A") || zone.startsWith("V")) return "#c0392b";
-//   if (zone === "X") return "#27ae60";
-//   return "#7f8c8d";
-// }
