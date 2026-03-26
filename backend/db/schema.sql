@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS disaster_declarations (
 CREATE INDEX IF NOT EXISTS disaster_declarations_geom_idx ON disaster_declarations USING GIST(geom);
 CREATE INDEX IF NOT EXISTS disaster_declarations_date_idx ON disaster_declarations(incident_begin_date);
 CREATE INDEX IF NOT EXISTS disaster_declarations_type_idx ON disaster_declarations(incident_type);
+CREATE INDEX IF NOT EXISTS disaster_declarations_county_type_idx ON disaster_declarations(county_fips, incident_type);
 
 -- Cached AI narratives (keyed by location hash)
 CREATE TABLE IF NOT EXISTS ai_narratives (
