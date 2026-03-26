@@ -29,22 +29,24 @@ The Render Blueprint tells Render what services to provision and how to configur
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
 
-<details>
+<!-- <details>
 <summary>If the button doesn't work</summary>
-1. Open the Render dashboard and click **New > Blueprint**.
-1. Find your newly forked repo in the list and click **Connect**.
-1. Specify a name for the blueprint (e.g. "hazardviewer") and select the branch to link (should be `main`)
-</details>
+<ol>
+<li>Open the Render dashboard and click <strong>New > Blueprint**</strong>.
+<li>Find your newly forked repo in the list and click <strong>Connect</strong>.</li>
+<li>Specify a name for the blueprint (e.g. "hazardviewer") and select the branch to link (should be `main`)</li>
+</ol>
+</details> -->
 
 1. Review the list of services for Render to create as defined the Blueprint. There are four services:
   - `hazardviewer-api` (web service): a FastAPI web service/backend that contains all application logic
   - `hazardviewer-frontend` (static site): a React frontend that displays the map and hazard narrative
   - `hazardviewer-sync` (cron job): a cron job that runs nightly and syncs FEMA disaster designations to the database
   - `hazardviewer-db` (database): a PostgreSQL database that holds counties, FEMA disaster declarations, flood zones, and generated AI narratives
-1. Add values for the two environment variables:
+2. Add values for the two environment variables:
   - `ANTHROPIC_API_KEY`: the Anthropic API Key you generated for this project
   - `VITE_API_URL`: the URL used by the frontend to query the backend. Set to `https://hazardviewer-api.onrender.com`.
-1. Click **Deploy Blueprint** to start provisioning.
+3. Click **Deploy Blueprint** to start provisioning.
 
 Note: if you already have services with the same names as defined in your blueprint, Render will append something to the end of each of the services. It'll be the same thing. If that happens, add that appendage to the VITE_API_URL.
 
