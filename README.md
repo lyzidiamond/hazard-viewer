@@ -154,7 +154,7 @@ The goal of Hazard Viewer is to show what's possible when deploying a multiservi
 
 ### Some app weirdness
 
-- **Connecticut doesn't work and Virginia looks strange:** Federal data is often inconsistent. Each county has a FIPS code to better categorize and connect data, but those codes aren't static: in 2022, Connecticut started managing its federal data not by county, but by administrative planning region. These regions all have new FIPS codes, which means the federal disaster declarations no longer match the counties. Similarly, Virginia separates its data into both counties and cities, so some declarations are specific to cities.
+- **Connecticut doesn't work and Virginia looks strange.** Federal data is often inconsistent. Each county has a FIPS code to better categorize and connect data, but those codes aren't static: in 2022, Connecticut started managing its federal data not by county, but by administrative planning region. These regions all have new FIPS codes, which means the federal disaster declarations no longer match the counties. Similarly, Virginia separates its data into both counties and cities, so some declarations are specific to cities.
 - **The narrative can take a while to generate.** Using Claude Sonnet is more accurate than Haiku, but makes the narrative generation slower.
 - **It doesn't look beautiful on mobile.** This app is designed for desktop, not mobile. It works on mobile, but you can't see the map and the narrative panel at the same time -- you tap a location, the narrative panel appears, and the map is visible when you dismiss it.
 
