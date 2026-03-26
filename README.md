@@ -4,12 +4,12 @@ Hazard Viewer is a Python web app that takes a location in the United States and
 
 This is a demo app designed to demonstrate how you can deploy a multiservice application to Render in just a few steps. The special sauce here is the Render Blueprint -- the `render.yaml` file. With a Render Blueprint, all of the services are defined in the YAML file and deployed automatically when you push the file to your codebase.
 
-[Quickstart: Deploy to Render](#quickstart-deploy-to-render)
-[How the app works](#how-the-app-works)
-[Considerations and tradeoffs](#considerations-and-tradeoffs)
-[How to take this further](#how-to-go-further)
+- [Quickstart: Deploy to Render](#quickstart-deploy-to-render)
+- [How the app works](#how-the-app-works)
+- [Considerations and tradeoffs](#considerations-and-tradeoffs)
+- [How to take this further](#how-to-go-further)
 
-Where should I put info about natural hazards, hazard declarations, how the app actually works outside of the tech side? I think "how the app works" in a collapsed section
+<!-- Where should I put info about natural hazards, hazard declarations, how the app actually works outside of the tech side? I think "how the app works" in a collapsed section -->
 
 ## Quickstart: Deploy to Render
 
