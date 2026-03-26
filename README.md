@@ -2,6 +2,8 @@
 
 [Hazard Viewer](https://hazardviewer-frontend-87s3.onrender.com/) is a Python web app that takes a location and uses FEMA data and AI to generate a regional natural hazard risk assessment. Click on the map to see federal disaster declarations within 100km and a summary of the natural hazard risk in the area.
 
+<img width="949" height="684" alt="Screenshot 2026-03-26 at 3 55 39 PM" src="https://github.com/user-attachments/assets/45e4319c-00ce-427d-967e-ea3c9701662c" />
+
 This is a demo app designed to demonstrate how you can [deploy a multiservice AI application to Render](https://render.com/docs/multi-service-architecture) in just a few steps. The special sauce here is the [Render Blueprint](https://render.com/docs/infrastructure-as-code) -- the `render.yaml` file. With a Render Blueprint, all of the services are defined in the YAML file and deployed automatically when you push the file to your codebase.
 
 ## Why I built this
