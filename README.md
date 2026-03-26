@@ -1,8 +1,9 @@
 # Hazard Viewer
 
-[Hazard Viewer](https://hazardviewer-frontend-87s3.onrender.com/) is a Python web app that takes a location and uses FEMA data and AI to generate a regional natural hazard risk assessment. Click on the map to see federal disaster declarations within 100km and a summary of the natural hazard risk in the area.
+[Hazard Viewer](https://hazardviewer-frontend-87s3.onrender.com/) is a Python web app that takes a location and uses FEMA data and AI to generate a regional natural hazard risk assessment. Click on the map to see federal disaster declarations within 100km and a summary of the natural hazard risk in the area. The app is currently [deployed on Render](https://hazardviewer-frontend-87s3.onrender.com/).
 
 <img width="949" height="684" alt="Screenshot 2026-03-26 at 3 55 39 PM" src="https://github.com/user-attachments/assets/45e4319c-00ce-427d-967e-ea3c9701662c" />
+
 
 This is a demo app designed to demonstrate how you can [deploy a multiservice AI application to Render](https://render.com/docs/multi-service-architecture) in just a few steps. The special sauce here is the [Render Blueprint](https://render.com/docs/infrastructure-as-code) -- the `render.yaml` file. With a Render Blueprint, all of the services are defined in the YAML file and deployed automatically when you push the file to your codebase.
 
@@ -161,7 +162,8 @@ The goal of Hazard Viewer is to show what's possible when deploying a multiservi
 
 One of the nice things about this app is how many different ways you can extend it.
 
-1. **Add auth and storage for specific narratives.** Users can log in and see the narratives for the places they care about and when they've been updated. Auth would also enable rate limiting, protecting your Anthropic account from getting hammered with requests.
-2. **Additional frontend features.** There are several enhancements that can be made on the frontend side to reel users in: add a location lookup instead of just map clicks, make the layout usable on mobile, zoom to current location, etc.
-3. **Add additional data sources.** FEMA maintains a National Risk Index that reflects its own risk analysis, but it doesn't have a publicly accessible API. Add logic to pull down the data, add it to the database, and use it as part of the risk context sent to Claude to help generate the narrative. Another option is to populate the `population` column in the `counties` table (currently in the table but empty) and use the data to enable per-capita risk normalization.
-4. **Fix Connecticut and future-proof against other county changes.** This is some low-hanging fruit but could be fixed by finding or creating a more-frequently-updated county boundary dataset.
+1. **Auth and storage for specific narratives.** Users can log in and see the narratives for the places they care about and when they've been updated. Auth would also enable rate limiting, protecting your Anthropic account from getting hammered with requests.
+2. **Deep linking.** Users can share the narratives for specific locations with deep links that include the queried location.
+3. **Additional frontend features.** There are several enhancements that can be made on the frontend side to reel users in: add a location lookup instead of just map clicks, make the layout usable on mobile, zoom to current location, etc.
+4. **Additional data sources.** FEMA maintains a National Risk Index that reflects its own risk analysis, but it doesn't have a publicly accessible API. Add logic to pull down the data, add it to the database, and use it as part of the risk context sent to Claude to help generate the narrative. Another option is to populate the `population` column in the `counties` table (currently in the table but empty) and use the data to enable per-capita risk normalization.
+5. **Fix Connecticut and future-proof against other county changes.** This is some low-hanging fruit but could be fixed by finding or creating a more-frequently-updated county boundary dataset.
