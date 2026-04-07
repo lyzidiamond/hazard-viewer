@@ -3,20 +3,7 @@ import "../panel.css";
 
 export default function NarrativePanel({ lat, lng, narrative, loading, error, onClose }) {
   return (
-    <div data-theme="light" className="narrative-panel" style={{
-      position: "absolute",
-      top: 0,
-      right: 0,
-      width: "400px",
-      height: "100vh",
-      background: "var(--pico-background-color)",
-      boxShadow: "-2px 0 8px rgba(0,0,0,0.15)",
-      overflowY: "auto",
-      padding: "24px",
-      display: "flex",
-      flexDirection: "column",
-      gap: "16px",
-    }}>
+    <div data-theme="light" className="narrative-panel">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h2 style={{ margin: 0, fontSize: "16px" }}>
           {lat.toFixed(4)}, {lng.toFixed(4)}
