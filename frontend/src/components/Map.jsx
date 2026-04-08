@@ -6,8 +6,19 @@ import { getCounties } from "../api/client";
 
 const EMPTY_GEOJSON = { type: "FeatureCollection", features: [] };
 
-export default function Map({ onMapClick }) {
+export default function Map({ onMapClick, pendingBounds }) {
   const mapContainer = useRef(null);
+  const mapRef = useRef(null);
+
+  useEffect(() => {
+    if (!pendingBounds || !mapRef.current) return;
+    const map = mapRef.current;
+    // defer until after React has rendered the panel and CSS has resized the map container
+    setTimeout(() => {
+      map.resize();
+      map.fitBounds(pendingBounds, { padding: 40, essential: true });
+    }, 0);
+  }, [pendingBounds]);
 
   useEffect(() => {
     const map = new maplibregl.Map({
@@ -114,7 +125,6 @@ export default function Map({ onMapClick }) {
 
       const circle = turf.circle([lng, lat], 100, { units: "kilometers" });
       map.getSource("query-radius").setData(circle);
-      map.fitBounds(turf.bbox(circle), { padding: 40, essential: true });
 
       // fetch county boundaries for the clicked location and update the source
       getCounties(lat, lng).then((geojson) => {
@@ -123,9 +133,10 @@ export default function Map({ onMapClick }) {
         map.getSource("county-boundaries").setData(geojson);
       });
 
-      onMapClick(lat, lng);
+      onMapClick(lat, lng, turf.bbox(circle));
     });
 
+    mapRef.current = map;
     map.addControl(new maplibregl.AttributionControl(), "top-left");
 
     return () => map.remove();
