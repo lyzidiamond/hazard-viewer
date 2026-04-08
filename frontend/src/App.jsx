@@ -36,7 +36,7 @@ export default function App() {
   }
 
   return (
-    <div style={{ display: "flex", height: "100vh", width: "100vw", position: "relative" }}>
+    <div className="app-layout">
       {showIntro && <IntroOverlay onDismiss={() => setShowIntro(false)} />}
       <Map onMapClick={handleMapClick} />
       {selection && (

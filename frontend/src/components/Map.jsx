@@ -106,15 +106,15 @@ export default function Map({ onMapClick }) {
 
     map.on("click", (e) => {
       const { lng, lat } = e.lngLat;
-      map.flyTo({ center: e.lngLat, zoom: 7, essential: true });
 
       map.getSource("clicked-point").setData({
         type: "Feature",
         geometry: { type: "Point", coordinates: [lng, lat] },
       });
-      map.getSource("query-radius").setData(
-        turf.circle([lng, lat], 100, { units: "kilometers" })
-      );
+
+      const circle = turf.circle([lng, lat], 100, { units: "kilometers" });
+      map.getSource("query-radius").setData(circle);
+      map.fitBounds(turf.bbox(circle), { padding: 40, essential: true });
 
       // fetch county boundaries for the clicked location and update the source
       getCounties(lat, lng).then((geojson) => {
@@ -131,5 +131,5 @@ export default function Map({ onMapClick }) {
     return () => map.remove();
   }, []);
 
-  return <div ref={mapContainer} style={{ width: "100%", height: "100%" }} />;
+  return <div ref={mapContainer} className="map-container" />;
 }
