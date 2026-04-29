@@ -3,6 +3,11 @@ const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 // throws error on non-200 responses
 async function apiFetch(path, signal) {
   const resp = await fetch(`${API_URL}${path}`, { signal });
+  if (resp.status === 429) {
+    const retryAfter = resp.headers.get("Retry-After");
+    const minutes = retryAfter ? Math.ceil(retryAfter / 60) : 60;
+    throw new Error(`rate_limited:${minutes}`);
+  }
   if (!resp.ok) throw new Error(`API error ${resp.status}: ${path}`);
   return resp.json();
 }

@@ -5,3 +5,4 @@ psycopg2-binary
 shapely
 httpx
 anthropic
+slowapi

@@ -5,9 +5,10 @@ from datetime import datetime, timezone
 
 import anthropic
 from anthropic.types import TextBlock
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request, Response
 
 from db.connection import get_conn
+from limiter import limiter
 from routes.declarations import fetch_declarations
 from routes.zone import get_zone
 
@@ -64,7 +65,10 @@ Data:
 
 
 @router.get("/narrative")
+# @limiter.limit("2/minute")
 async def get_narrative(
+    request: Request,
+    response: Response,
     lat: float = Query(..., ge=-90, le=90),
     lng: float = Query(..., ge=-180, le=180),
 ):
