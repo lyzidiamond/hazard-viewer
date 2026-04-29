@@ -1,6 +1,6 @@
 # Hazard Viewer
 
-[Hazard Viewer](https://hazardviewer-frontend-87s3.onrender.com/) is a Python web app that takes a location and uses FEMA data and AI to generate a regional natural hazard risk assessment. Click on the map to see federal disaster declarations within 100km and a summary of the natural hazard risk in the area. The app is currently [deployed on Render](https://hazardviewer-frontend-87s3.onrender.com/).
+[Hazard Viewer](https://hazardviewer-frontend-87s3.onrender.com/) is a Python web app that takes a location and uses FEMA data and AI to generate a regional natural hazard risk assessment. Click on the map to see federal disaster declarations within 100km and a summary of the natural hazard risk in the area. The app is currently [deployed on Render](https://hazardviewer-frontend.onrender.com/).
 
 <img width="949" height="684" alt="Screenshot 2026-03-26 at 3 55 39 PM" src="https://github.com/user-attachments/assets/45e4319c-00ce-427d-967e-ea3c9701662c" />
 
