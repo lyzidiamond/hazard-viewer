@@ -43,8 +43,8 @@ export default function App() {
     } catch (err) {
       if (err.name === "AbortError") return;
       if (err.message.startsWith("rate_limited:")) {
-        const minutes = err.message.split(":")[1];
-        setError(`You've reached the request limit. Try again in ${minutes} minute${minutes === "1" ? "" : "s"}.`);
+        const seconds = err.message.split(":")[1];
+        setError(`You've reached the request limit. Try again in ${seconds} second${seconds === "1" ? "" : "s"}.`);
       } else {
         setError("Failed to load flood data for this location.");
       }

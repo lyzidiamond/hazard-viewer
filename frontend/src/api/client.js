@@ -5,8 +5,8 @@ async function apiFetch(path, signal) {
   const resp = await fetch(`${API_URL}${path}`, { signal });
   if (resp.status === 429) {
     const retryAfter = resp.headers.get("Retry-After");
-    const minutes = retryAfter ? Math.ceil(retryAfter / 60) : 60;
-    throw new Error(`rate_limited:${minutes}`);
+    const seconds = retryAfter ? parseInt(retryAfter) : 60;
+    throw new Error(`rate_limited:${seconds}`);
   }
   if (!resp.ok) throw new Error(`API error ${resp.status}: ${path}`);
   return resp.json();
@@ -25,8 +25,8 @@ export async function* streamNarrative(lat, lng, signal) {
   const resp = await fetch(`${API_URL}/api/narrative/stream?lat=${lat}&lng=${lng}`, { signal });
   if (resp.status === 429) {
     const retryAfter = resp.headers.get("Retry-After");
-    const minutes = retryAfter ? Math.ceil(retryAfter / 60) : 60;
-    throw new Error(`rate_limited:${minutes}`);
+    const seconds = retryAfter ? parseInt(retryAfter) : 60;
+    throw new Error(`rate_limited:${seconds}`);
   }
   if (!resp.ok) throw new Error(`API error ${resp.status}: /api/narrative/stream`);
 
