@@ -7,6 +7,8 @@
 
 This is a demo app designed to demonstrate how you can [deploy a multiservice AI application to Render](https://render.com/docs/multi-service-architecture) in just a few steps. The special sauce here is the [Render Blueprint](https://render.com/docs/infrastructure-as-code) -- the `render.yaml` file. With a Render Blueprint, all of the services are defined in the YAML file and deployed automatically when you push the file to your codebase.
 
+
+
 ## Why I built this
 
 My first job out of college was as a GIS Technician at the Oregon Department of Geology and Mineral Industries working on floodplain delineation and mapping contracts for [FEMA's Risk Mapping, Assessment and Planning](https://www.fema.gov/flood-maps/tools-resources/risk-map) program. I worked on two key parts of these projects: I wrote discovery reports on natural hazards in the contract region, and I created the flood zone data to go in the National Flood Hazard Layer dataset. This data is still used to this day (as far as I know Oregon's coastal counties haven't been updated in the last 15 years).
@@ -16,6 +18,15 @@ This data is buried in regulatory documents and not super accessible to someone 
 The first version of Hazard Viewer was called Flood Report, and it showed the location's flood zone designation and a brief narrative about what that designation means. This was exciting, but didn't go quite far enough -- why limit the risk narrative to just floods when we have access to information about all natural hazards?
 
 And thus Hazard Viewer was born. The app expands on the original logic: instead of just pulling down and storing flood disaster declarations, the database stores all disaster declarations. Instead of the Claude prompt asking for flood risk summaries, the app asks for summaries of all natural hazards. The result is an overall more useful product that gives comprehensive information about natural hazard risks.
+
+## Changelog
+
+### 5/27/26
+
+- **Rate limiting:** Added slowapi for per-IP rate limiting on the narrative endpoint. The app now returns a 429 with a Retry-After header when the limit is hit and displays a message to the user.
+- **NFHL timeout handling:** Raised timeouts from the National Flood Hazard Layer from 10 seconds to 30 seconds. Timeouts return an "unavailable" state.
+- **/narrative/stream endpoint:** Added a streaming endpoint to enable streaming text from Claude instead of waiting for the whole narrative to generate first.
+- **CSS updates:** Removed Pico CSS and added custom styling and fonts. Added a mobile layout. Map uses `fitBounds` instead of `flyTo` to ensure entire selected region is in the map frame.
 
 ## Table of Contents
 
@@ -114,12 +125,13 @@ The nightly cron job ([sync_fema.py](/cron/sync_fema.py)) updates the federal di
 
 ### The web service
 
-The FastAPI web service defines four public routes:
+The FastAPI web service defines five public routes:
 
 - `/counties`: returns counties that intersect a 100km radius around a point as a [GeoJSON](https://geojson.org/) FeatureCollection. This route is called by the frontend to render county boundaries on the map. 
 - `/declarations`: returns disaster declarations in counties within a 100km radius of a point. The `fetch_declarations` function defined in this route is called by `narrative.py` as information used to generate the hazard assessment, but it's also available as a public endpoint.
 - `/zone`: returns the [National Flood Hazard Layer](https://www.fema.gov/flood-maps/national-flood-hazard-layer) flood zone for the clicked location. The `get_zone` function defined in this route is called by `narrative.py` as information used to generate the hazard assessment, but it's also available as a public endpoint.
 - `/narrative`: generates and returns the hazard narrative displayed to the user. This route is called by the frontend when the map is clicked. It contains the main logic of the app: it generates context using disaster declarations and flood zones and passes them along with a detailed prompt to the LLM, which generates the narrative.
+- `/narrative/stream`: streams the hazard narrative as [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events) instead of waiting for the full response. For cached narratives, the full text is returned immediately as a single chunk. For fresh generations, text chunks are forwarded to the client as they arrive from Claude, so the narrative appears word-by-word rather than all at once.
 
 ### The frontend
 
@@ -155,8 +167,8 @@ The goal of Hazard Viewer is to show what's possible when deploying a multiservi
 ### Some app weirdness
 
 - **Connecticut doesn't work and Virginia looks strange.** Federal data is often inconsistent. Each county has a FIPS code to better categorize and connect data, but those codes aren't static: in 2022, Connecticut started managing its federal data not by county, but by administrative planning region. These regions all have new FIPS codes, which means the federal disaster declarations no longer match the counties. Similarly, Virginia separates its data into both counties and cities, so some declarations are specific to cities.
-- **The narrative can take a while to generate.** Using Claude Sonnet is more accurate than Haiku, but makes the narrative generation slower.
-- **It doesn't look beautiful on mobile.** This app is designed for desktop, not mobile. It works on mobile, but you can't see the map and the narrative panel at the same time -- you tap a location, the narrative panel appears, and the map is visible when you dismiss it.
+- ~**The narrative can take a while to generate.** Using Claude Sonnet is more accurate than Haiku, but makes the narrative generation slower.~ Addressed in 5/27/26 update: text now streams into the narrative panel instead of waiting for 
+- ~**It doesn't look beautiful on mobile.** This app is designed for desktop, not mobile. It works on mobile, but you can't see the map and the narrative panel at the same time -- you tap a location, the narrative panel appears, and the map is visible when you dismiss it.~ Addressed in 5/27/26 update: new mobile layout.
 
 ## How to go further
 
