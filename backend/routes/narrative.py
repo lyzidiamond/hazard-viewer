@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import anthropic
 from anthropic.types import TextBlock
 from fastapi import APIRouter, Query, Request, Response
+from fastapi.responses import StreamingResponse
 
 from db.connection import get_conn
 from limiter import limiter
@@ -39,8 +40,8 @@ def _build_trend(declarations: list[dict]) -> dict:
     return trend
 
 # the prompt sent to Claude to generate the narrative
-async def _generate_narrative(context: dict) -> str:
-    prompt = f"""You are writing a natural hazard risk assessment for a layperson with minimal background in the field. Based on the following data, write a plain-English natural hazard risk narrative for this location. Be colloquial, but professional.
+def _build_prompt(context: dict) -> str:
+    return f"""You are writing a natural hazard risk assessment for a layperson with minimal background in the field. Based on the following data, write a plain-English natural hazard risk narrative for this location. Be colloquial, but professional.
 
 - The data includes all federal disaster declarations within 100km.
 - If the selected location is outside of the United States, say "While this location is outside the United States and has no federal disaster declarations, it's important to consider local hazard history and risk factors when assessing natural hazard risk." and do not attempt to generate a narrative based on the provided data. Don't include the "general risk" section or the list of declarations, since those are based on US-specific data. Do not make up any information about the area.
@@ -54,10 +55,12 @@ async def _generate_narrative(context: dict) -> str:
 Data:
 {json.dumps(context, indent=2, default=str)}"""
 
+
+async def _generate_narrative(context: dict) -> str:
     message = await _anthropic.messages.create(
         model="claude-sonnet-4-6", # claude sonnet is a more robust model so it takes longer, but is more consistent than haiku or other faster models
         max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[{"role": "user", "content": _build_prompt(context)}],
     )
     if not isinstance(message.content[0], TextBlock):
         raise ValueError("Unexpected response type from Claude")
@@ -142,6 +145,91 @@ async def get_narrative(
         "generated_at": datetime.now(timezone.utc),
         "cached": False,
     }
+
+@router.get("/narrative/stream")
+async def stream_narrative(
+    request: Request,
+    lat: float = Query(..., ge=-90, le=90),
+    lng: float = Query(..., ge=-180, le=180),
+):
+    location_hash = _location_hash(lat, lng)
+
+    async def generate():
+        # return cached narrative immediately as a single chunk
+        async with get_conn() as conn:
+            cached = await conn.fetchrow(
+                """
+                SELECT narrative, flood_zone, generated_at
+                FROM ai_narratives
+                WHERE location_hash = $1 AND invalidated_at IS NULL
+                """,
+                location_hash,
+            )
+
+        if cached:
+            yield f"data: {json.dumps({'type': 'chunk', 'text': cached['narrative']})}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'flood_zone': cached['flood_zone'], 'generated_at': cached['generated_at'].isoformat(), 'cached': True})}\n\n"
+            return
+
+        # fetch fresh data
+        declarations = await fetch_declarations(lat=lat, lng=lng, radius=100)
+        # get flood zone
+        zone = await get_zone(lat=lat, lng=lng)
+
+        # group declarations by incident type for richer narrative context
+        by_type = {}
+        for d in declarations:
+            t = d.get("incident_type") or "Unknown"
+            by_type.setdefault(t, []).append(d)
+
+        # create a context object to feed to the model when creating a narrative
+        context = {
+            "location": {"lat": lat, "lng": lng},
+            "flood_zone": zone["flood_zone"],
+            "flood_zone_description": zone["description"],
+            "declaration_count": len(declarations),
+            "declarations_by_type": {t: len(v) for t, v in by_type.items()},
+            "declarations": declarations,
+            "trend": _build_trend(declarations),
+        }
+
+        full_narrative = ""
+        async with _anthropic.messages.stream(
+            model="claude-sonnet-4-6", # claude sonnet is a more robust model so it takes longer, but is more consistent than haiku or other faster models
+            max_tokens=1024,
+            messages=[{"role": "user", "content": _build_prompt(context)}],
+        ) as stream:
+            async for text in stream.text_stream:
+                full_narrative += text
+                yield f"data: {json.dumps({'type': 'chunk', 'text': text})}\n\n"
+
+        # cache the result (add to database)
+        async with get_conn() as conn:
+            await conn.execute(
+                """
+                INSERT INTO ai_narratives
+                    (location_hash, lat, lng, geom, flood_zone, narrative, raw_context)
+                VALUES
+                    ($1, $2, $3, ST_SetSRID(ST_MakePoint($3, $2), 4326), $4, $5, $6)
+                ON CONFLICT (location_hash) DO UPDATE SET
+                    narrative = EXCLUDED.narrative,
+                    flood_zone = EXCLUDED.flood_zone,
+                    raw_context = EXCLUDED.raw_context,
+                    generated_at = NOW(),
+                    invalidated_at = NULL
+                """,
+                location_hash, lat, lng, zone["flood_zone"], full_narrative,
+                json.dumps(context, default=str)
+            )
+
+        yield f"data: {json.dumps({'type': 'done', 'flood_zone': zone['flood_zone'], 'generated_at': datetime.now(timezone.utc).isoformat(), 'cached': False})}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
 
 # invalidate narrative. called if new disaster declarations are available within 100km
 @router.post("/narrative/invalidate")

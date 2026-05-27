@@ -1,6 +1,6 @@
 import "../panel.css";
 
-export default function NarrativePanel({ lat, lng, narrative, loading, error, onClose }) {
+export default function NarrativePanel({ lat, lng, narrativeHtml, narrativeMeta, loading, error, onClose }) {
   return (
     <div className="narrative-panel">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -16,15 +16,16 @@ export default function NarrativePanel({ lat, lng, narrative, loading, error, on
 
       {error && <p style={{ color: "var(--color-red)" }}>{error}</p>}
 
-      {narrative && (
-        <>
-          <div className="narrative-content"
-            dangerouslySetInnerHTML={{ __html: narrative.narrative }}
-          />
-          <small style={{ color: "var(--color-muted)" }}>
-            {narrative.cached ? "Cached" : "Generated"} · {new Date(narrative.generated_at).toLocaleDateString()}
-          </small>
-        </>
+      {narrativeHtml && (
+        <div className="narrative-content"
+          dangerouslySetInnerHTML={{ __html: narrativeHtml }}
+        />
+      )}
+
+      {narrativeMeta && (
+        <small style={{ color: "var(--color-muted)" }}>
+          {narrativeMeta.cached ? "Cached" : "Generated"} · {new Date(narrativeMeta.generated_at).toLocaleDateString()}
+        </small>
       )}
     </div>
   );

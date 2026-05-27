@@ -2,13 +2,14 @@ import { useState, useRef } from "react";
 import Map from "./components/Map";
 import NarrativePanel from "./components/NarrativePanel";
 import IntroOverlay from "./components/IntroOverlay";
-import { getNarrative } from "./api/client";
+import { streamNarrative } from "./api/client";
 
 export default function App() {
   const [showIntro, setShowIntro] = useState(true);
   const [selection, setSelection] = useState(null); // { lat, lng }
   const [pendingBounds, setPendingBounds] = useState(null);
-  const [narrative, setNarrative] = useState(null);
+  const [narrativeHtml, setNarrativeHtml] = useState(null); // accumulates streamed HTML
+  const [narrativeMeta, setNarrativeMeta] = useState(null); // set on stream completion
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const abortRef = useRef(null);
@@ -21,13 +22,24 @@ export default function App() {
     abortRef.current = controller;
 
     setSelection({ lat, lng });
-    setNarrative(null);
+    setNarrativeHtml(null);
+    setNarrativeMeta(null);
     setError(null);
     setLoading(true);
 
     try {
-      const data = await getNarrative(lat, lng, controller.signal);
-      setNarrative(data);
+      for await (const event of streamNarrative(lat, lng, controller.signal)) {
+        if (event.type === "chunk") {
+          setLoading(false);
+          setNarrativeHtml((prev) => (prev ?? "") + event.text);
+        } else if (event.type === "done") {
+          setNarrativeMeta({
+            flood_zone: event.flood_zone,
+            generated_at: event.generated_at,
+            cached: event.cached,
+          });
+        }
+      }
     } catch (err) {
       if (err.name === "AbortError") return;
       if (err.message.startsWith("rate_limited:")) {
@@ -49,7 +61,8 @@ export default function App() {
         <NarrativePanel
           lat={selection.lat}
           lng={selection.lng}
-          narrative={narrative}
+          narrativeHtml={narrativeHtml}
+          narrativeMeta={narrativeMeta}
           loading={loading}
           error={error}
           onClose={() => setSelection(null)}
