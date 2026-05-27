@@ -68,7 +68,7 @@ async def _generate_narrative(context: dict) -> str:
 
 
 @router.get("/narrative")
-# @limiter.limit("2/minute")
+@limiter.limit("2/minute")
 async def get_narrative(
     request: Request,
     response: Response,
@@ -147,6 +147,7 @@ async def get_narrative(
     }
 
 @router.get("/narrative/stream")
+@limiter.limit("2/minute")
 async def stream_narrative(
     request: Request,
     lat: float = Query(..., ge=-90, le=90),
