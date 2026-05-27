@@ -128,6 +128,22 @@ body {
   background: #245d94;
 }
 
+/* attribution line used in both intro card and narrative panel */
+.attribution {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  margin: 0;
+}
+
+.attribution a {
+  color: var(--color-blue);
+  text-decoration: none;
+}
+
+.attribution a:hover {
+  text-decoration: underline;
+}
+
 /* narrative panel layout */
 .narrative-panel {
   width: 400px;

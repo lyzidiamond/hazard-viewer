@@ -3,6 +3,9 @@ import "../panel.css";
 export default function NarrativePanel({ lat, lng, narrativeHtml, narrativeMeta, loading, error, onClose }) {
   return (
     <div className="narrative-panel">
+      <p className="attribution">
+        A project by <a href="https://lyzidiamond.github.io" target="_blank" rel="noreferrer">Lyzi Diamond</a>. The code lives on <a href="https://github.com/lyzidiamond/hazard-viewer" target="_blank" rel="noreferrer">GitHub</a>.
+      </p>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h2 className="coordinates" style={{ margin: 0 }}>
           {lat.toFixed(4)}, {lng.toFixed(4)}

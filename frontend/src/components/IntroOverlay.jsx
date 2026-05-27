@@ -15,6 +15,9 @@ export default function IntroOverlay({ onDismiss }) {
         <button className="intro-btn" onClick={onDismiss}>
           Explore the map
         </button>
+        <p className="attribution">
+          A project by <a href="https://lyzidiamond.github.io" target="_blank" rel="noreferrer">Lyzi Diamond</a>. The code lives on <a href="https://github.com/lyzidiamond/hazard-viewer" target="_blank" rel="noreferrer">GitHub</a>.
+        </p>
       </div>
     </div>
   );
