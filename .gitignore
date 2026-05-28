@@ -2,3 +2,7 @@
 .DS_Store
 .vscode
 node_modules/
+.claude/
+PLANNING.md
+floodreport-debug-summary.md
+notes.md
