@@ -1,4 +1,5 @@
 # Narrative route: returns the AI-generated narrative for the clicked location
+import asyncio
 import hashlib
 import json
 from datetime import datetime, timezone
@@ -22,7 +23,7 @@ def _location_hash(lat: float, lng: float) -> str:
     key = f"{round(lat, 2)},{round(lng, 2)}"
     return hashlib.sha256(key.encode()).hexdigest()[:16]
 
-# groups flood declarations into rough time periods to show trends without overfitting to specific years or events
+# groups declarations into rough time periods to show trends without overfitting to specific years or events
 def _build_trend(declarations: list[dict]) -> dict:
     trend = {"1953_1980": 0, "1981_2000": 0, "2001_2010": 0, "2011_present": 0}
     for d in declarations:
@@ -65,62 +66,97 @@ def _build_declaration_list(declarations: list[dict]) -> str:
 
     return f"<ul>{''.join(items)}</ul>"
 
+# queries the counties table for the nearest US county to the clicked point.
+# returns None if the point is more than 200km from any county (i.e. outside the US).
+async def _get_nearest_county(lat: float, lng: float) -> dict | None:
+    async with get_conn() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT name, state,
+                ST_Distance(geom::geography, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography) / 1000 AS dist_km
+            FROM counties
+            ORDER BY geom <-> ST_SetSRID(ST_MakePoint($2, $1), 4326)
+            LIMIT 1
+            """,
+            lat, lng,
+        )
+    if row and row["dist_km"] < 200:
+        return dict(row)
+    return None
 
-# inserts the declaration list immediately after the closing </h3> tag in Claude's output
-def _inject_declaration_list(narrative: str, declarations: list[dict]) -> str:
-    list_html = _build_declaration_list(declarations)
-    marker = "</h3>"
-    idx = narrative.find(marker)
-    if idx != -1:
-        insert_at = idx + len(marker)
-        return narrative[:insert_at] + list_html + narrative[insert_at:]
-    # fallback: prepend if no <h3> found
-    return list_html + narrative
+# computes a risk level algorithmically from declaration counts and trend.
+# weights recent declarations (2011-present) 1.5x to reflect increasing hazard frequency.
+def _compute_risk(declarations: list[dict], trend: dict) -> tuple[str, str] | None:
+    if not declarations:
+        return None
+    total = len(declarations)
+    recent = trend.get("2011_present", 0)
+    score = (total - recent) + (recent * 1.5)
+    if score >= 50:
+        return "Very High", "red"
+    elif score >= 30:
+        return "High", "red"
+    elif score >= 15:
+        return "Moderate", "darkorange"
+    elif score >= 5:
+        return "Low", "green"
+    else:
+        return "Very Low", "green"
 
+# assembles the Python-generated portion of the narrative: title, risk level, and declaration list.
+# returns an empty string for non-US locations (Claude handles those entirely).
+def _build_preamble(nearest_county: dict | None, risk: tuple[str, str] | None, list_html: str) -> str:
+    if not nearest_county:
+        return ""
+    name, state = nearest_county["name"], nearest_county["state"]
+    title = f"<h2>Natural Hazard Risk Assessment — {name}, {state}</h2>"
+    risk_html = ""
+    if risk:
+        label, color = risk
+        risk_html = f'<h3>General risk: <span style="color: {color}">{label}</span></h3>'
+    return title + risk_html + list_html
 
 # the prompt sent to Claude to generate the narrative.
 # returns (system_prompt, user_message) to keep role and persona separate from the data.
-# the declaration list is built separately in Python and injected after the stream via a <!-- DECLARATIONS --> placeholder.
-def _build_prompt(context: dict) -> tuple[str, str]:
+# for US locations, Claude generates only the narrative paragraphs — title, risk, and declaration
+# list are all handled by Python. for non-US locations, Claude generates the full response.
+def _build_prompt(context: dict, is_us: bool) -> tuple[str, str]:
     lat = context["location"]["lat"]
     lng = context["location"]["lng"]
     data_source_url = f"https://api.fema.gov/open/v2/DisasterDeclarationsSummaries?lat={round(lat, 2)}&lng={round(lng, 2)}&radius=100"
 
-    system = """You are a natural hazard risk analyst writing plain-English assessments for a general audience. Be factual, direct, and colloquial but professional.
-
-## Non-US locations
-
-If the location is outside the United States, return only this and nothing else:
-
-<h2>[title]</h2>
-<p>While this location is outside the United States and has no federal disaster declarations, it's important to consider local hazard history and risk factors when assessing natural hazard risk.</p>
-
-Do not include a risk level, narrative paragraphs, or data source link. Do not fabricate any information about the area.
+    if is_us:
+        system = """You are a natural hazard risk analyst writing plain-English assessments for a general audience. Be factual, direct, and colloquial but professional.
 
 ## Output format
 
-Return semantic HTML only. The very first character must be `<`. Do not use code blocks or backticks.
+Output 3-4 `<p>` paragraph tags only. The title, risk level, and declaration list are generated separately — do not include them. End with a data source paragraph.
 
-Use this structure exactly:
-
-<h2>[title]</h2>
-<h3>General risk: <span style="color: [red|darkorange|green]">[Very Low|Low|Moderate|High|Very High]</span></h3>
 <p>[paragraph]</p>
 <p>[paragraph]</p>
 <p>[paragraph]</p>
 <p>Data source: <a href="[data_source_url]">[data_source_url]</a></p>
 
-Do not generate a declaration list — one will be injected programmatically after the `</h3>` tag.
+The very first character must be `<`. Do not use code blocks or backticks.
 
 ## Content requirements
 
-**Narrative:** 3-4 paragraphs, max 2 sentences each. Cover historical frequency and trend, most significant events, and overall risk characterization across all hazard types.
-
-**Risk level:** Assess as very low, low, moderate, high, or very high. Use red for high/very high, darkorange for moderate, green for low/very low.
+Cover historical frequency and trend, most significant events, and overall risk characterization across all hazard types. Max 2 sentences per paragraph.
 
 **Data source:** Use the URL provided in the data exactly as given. Place it only at the end."""
+    else:
+        system = """You are a natural hazard risk analyst writing plain-English assessments for a general audience. Be factual, direct, and colloquial but professional.
 
-    user = f"""Generate a natural hazard risk assessment for the following location.
+## Output format
+
+This location is outside the United States. Output only:
+
+<h2>Natural Hazard Risk Assessment — [general area name]</h2>
+<p>While this location is outside the United States and has no federal disaster declarations, it's important to consider local hazard history and risk factors when assessing natural hazard risk.</p>
+
+The very first character must be `<`. Do not use code blocks or backticks. Do not fabricate any information."""
+
+    user = f"""Generate a natural hazard risk narrative for the following location.
 
 Data:
 {json.dumps({**context, "data_source_url": data_source_url}, indent=2, default=str)}"""
@@ -128,8 +164,9 @@ Data:
     return system, user
 
 
-async def _generate_narrative(context: dict) -> str:
-    system, user = _build_prompt(context)
+async def _generate_narrative(context: dict, nearest_county: dict | None, risk: tuple[str, str] | None) -> str:
+    is_us = nearest_county is not None
+    system, user = _build_prompt(context, is_us)
     message = await _anthropic.messages.create(
         model="claude-sonnet-4-6", # claude sonnet is a more robust model so it takes longer, but is more consistent than haiku or other faster models
         max_tokens=1024,
@@ -138,7 +175,8 @@ async def _generate_narrative(context: dict) -> str:
     )
     if not isinstance(message.content[0], TextBlock):
         raise ValueError("Unexpected response type from Claude")
-    return _inject_declaration_list(message.content[0].text, context["declarations"])
+    preamble = _build_preamble(nearest_county, risk, _build_declaration_list(context["declarations"]))
+    return preamble + message.content[0].text
 
 
 @router.get("/narrative")
@@ -172,14 +210,20 @@ async def get_narrative(
 
     # fetch fresh data
     declarations = await fetch_declarations(lat=lat, lng=lng, radius=100)
-    # get flood zone
-    zone = await get_zone(lat=lat, lng=lng)
+    # get flood zone and nearest county in parallel
+    zone, nearest_county = await asyncio.gather(
+        get_zone(lat=lat, lng=lng),
+        _get_nearest_county(lat, lng),
+    )
 
     # group declarations by incident type for richer narrative context
     by_type = {}
     for d in declarations:
         t = d.get("incident_type") or "Unknown"
         by_type.setdefault(t, []).append(d)
+
+    trend = _build_trend(declarations)
+    risk = _compute_risk(declarations, trend)
 
     # create a context object to feed to the model when creating a narrative
     context = {
@@ -189,10 +233,10 @@ async def get_narrative(
         "declaration_count": len(declarations),
         "declarations_by_type": {t: len(v) for t, v in by_type.items()},
         "declarations": declarations,
-        "trend": _build_trend(declarations),
+        "trend": trend,
     }
 
-    narrative = await _generate_narrative(context)
+    narrative = await _generate_narrative(context, nearest_county, risk)
 
     # cache the result (add to database)
     async with get_conn() as conn:
@@ -248,14 +292,20 @@ async def stream_narrative(
 
         # fetch fresh data
         declarations = await fetch_declarations(lat=lat, lng=lng, radius=100)
-        # get flood zone
-        zone = await get_zone(lat=lat, lng=lng)
+        # get flood zone and nearest county in parallel
+        zone, nearest_county = await asyncio.gather(
+            get_zone(lat=lat, lng=lng),
+            _get_nearest_county(lat, lng),
+        )
 
         # group declarations by incident type for richer narrative context
         by_type = {}
         for d in declarations:
             t = d.get("incident_type") or "Unknown"
             by_type.setdefault(t, []).append(d)
+
+        trend = _build_trend(declarations)
+        risk = _compute_risk(declarations, trend)
 
         # create a context object to feed to the model when creating a narrative
         context = {
@@ -265,11 +315,17 @@ async def stream_narrative(
             "declaration_count": len(declarations),
             "declarations_by_type": {t: len(v) for t, v in by_type.items()},
             "declarations": declarations,
-            "trend": _build_trend(declarations),
+            "trend": trend,
         }
 
-        full_narrative = ""
-        system, user = _build_prompt(context)
+        # send the Python-generated preamble (title, risk, list) as the first chunk so it
+        # appears immediately while Claude streams the paragraphs
+        preamble = _build_preamble(nearest_county, risk, _build_declaration_list(declarations))
+        if preamble:
+            yield f"data: {json.dumps({'type': 'chunk', 'text': preamble})}\n\n"
+
+        full_paragraphs = ""
+        system, user = _build_prompt(context, is_us=nearest_county is not None)
         async with _anthropic.messages.stream(
             model="claude-sonnet-4-6", # claude sonnet is a more robust model so it takes longer, but is more consistent than haiku or other faster models
             max_tokens=1024,
@@ -277,12 +333,10 @@ async def stream_narrative(
             messages=[{"role": "user", "content": user}],
         ) as stream:
             async for text in stream.text_stream:
-                full_narrative += text
+                full_paragraphs += text
                 yield f"data: {json.dumps({'type': 'chunk', 'text': text})}\n\n"
 
-        # inject the declaration list and send the corrected HTML to the frontend
-        full_narrative = _inject_declaration_list(full_narrative, context["declarations"])
-        yield f"data: {json.dumps({'type': 'replace', 'html': full_narrative})}\n\n"
+        full_narrative = preamble + full_paragraphs
 
         # cache the result (add to database)
         async with get_conn() as conn:

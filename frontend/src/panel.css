@@ -32,6 +32,17 @@ body {
   overflow-wrap: break-word;
 }
 
+.narrative-panel .narrative-content details summary {
+  color: var(--color-blue);
+  cursor: pointer;
+  list-style: none;
+}
+
+.narrative-panel .narrative-content details summary::-webkit-details-marker {
+  display: none;
+}
+
+
 .narrative-panel .coordinates {
   font-family: "DM Mono", monospace;
   font-size: var(--text-xs);
