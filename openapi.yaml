@@ -1,0 +1,376 @@
+openapi: 3.1.0
+info:
+  title: Hazard Viewer API
+  description: >-
+    Backend for the flood/natural-hazard report map. Serves FEMA disaster
+    declarations, FEMA NFHL flood zones, county boundaries (as GeoJSON), and
+    AI-generated natural-hazard risk narratives for a clicked map location.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000
+    description: Local development
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: health
+      responses:
+        "200":
+          description: Service is up.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                required: [status]
+
+  /api/declarations:
+    get:
+      summary: FEMA disaster declarations near a point
+      description: >-
+        Returns FEMA disaster declarations within `radius` km of the given
+        point, ordered by incident begin date (most recent first). Optionally
+        filtered by incident type.
+      operationId: getDeclarations
+      parameters:
+        - $ref: "#/components/parameters/Lat"
+        - $ref: "#/components/parameters/Lng"
+        - $ref: "#/components/parameters/Radius"
+        - name: incident_type
+          in: query
+          required: false
+          description: Filter to a single incident type (e.g. "Flood", "Hurricane").
+          schema:
+            type: string
+            nullable: true
+      responses:
+        "200":
+          description: A list of disaster declarations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Declaration"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/zone:
+    get:
+      summary: FEMA NFHL flood zone at a point
+      description: >-
+        Proxies the FEMA National Flood Hazard Layer (NFHL) service to return
+        the flood zone intersecting the point. If FEMA is unavailable or returns
+        no data, `flood_zone` is null and `description` explains why.
+      operationId: getZone
+      parameters:
+        - $ref: "#/components/parameters/Lat"
+        - $ref: "#/components/parameters/Lng"
+      responses:
+        "200":
+          description: Flood zone information for the point.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Zone"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/narrative:
+    get:
+      summary: AI-generated hazard risk narrative
+      description: >-
+        Returns an AI-generated natural-hazard risk narrative (HTML) for the
+        point. Results are cached by location (~1 km precision); cached results
+        are returned immediately. Rate limited to 10 requests/minute per IP.
+      operationId: getNarrative
+      parameters:
+        - $ref: "#/components/parameters/Lat"
+        - $ref: "#/components/parameters/Lng"
+      responses:
+        "200":
+          description: The narrative for the point.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Narrative"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/narrative/stream:
+    get:
+      summary: AI-generated hazard risk narrative (streaming)
+      description: >-
+        Server-Sent Events stream of the narrative. Emits `chunk` events as the
+        text is generated (the Python-built preamble first, then the model's
+        paragraphs), followed by a single `done` event. Cached narratives are
+        sent as one `chunk` then `done`. Rate limited to 10 requests/minute per
+        IP.
+      operationId: streamNarrative
+      parameters:
+        - $ref: "#/components/parameters/Lat"
+        - $ref: "#/components/parameters/Lng"
+      responses:
+        "200":
+          description: >-
+            An `text/event-stream` of SSE messages. Each `data:` line is a JSON
+            object: `{"type":"chunk","text":"..."}` for content, and
+            `{"type":"done","flood_zone":"AE","generated_at":"...","cached":false}`
+            to finish.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/narrative/invalidate:
+    post:
+      summary: Invalidate cached narratives near a point
+      description: >-
+        Marks cached narratives within `radius_km` of the point as invalidated
+        so they will be regenerated on next request. Intended for use when new
+        disaster declarations become available.
+      operationId: invalidateNarratives
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: lng
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: radius_km
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 100
+      responses:
+        "200":
+          description: Number of narratives invalidated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  invalidated:
+                    type: integer
+                    example: 3
+                required: [invalidated]
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/counties:
+    get:
+      summary: County boundaries near a point (GeoJSON)
+      description: >-
+        Returns a GeoJSON FeatureCollection of US counties that either intersect
+        the search radius or contain the point. Each feature carries declaration
+        counts grouped by incident type. Consumable directly as a MapLibre
+        source.
+      operationId: getCounties
+      parameters:
+        - $ref: "#/components/parameters/Lat"
+        - $ref: "#/components/parameters/Lng"
+        - $ref: "#/components/parameters/Radius"
+      responses:
+        "200":
+          description: A GeoJSON FeatureCollection of counties.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CountyFeatureCollection"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+components:
+  parameters:
+    Lat:
+      name: lat
+      in: query
+      required: true
+      description: Latitude in decimal degrees.
+      schema:
+        type: number
+        minimum: -90
+        maximum: 90
+    Lng:
+      name: lng
+      in: query
+      required: true
+      description: Longitude in decimal degrees.
+      schema:
+        type: number
+        minimum: -180
+        maximum: 180
+    Radius:
+      name: radius
+      in: query
+      required: false
+      description: Search radius in kilometers.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 500
+        default: 100
+
+  responses:
+    ValidationError:
+      description: Request validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/HTTPValidationError"
+    RateLimited:
+      description: Rate limit exceeded (10 requests/minute per IP).
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Rate limit exceeded
+
+  schemas:
+    Declaration:
+      type: object
+      description: A single FEMA disaster declaration record.
+      properties:
+        disaster_number:
+          type: integer
+        county_name:
+          type: string
+          nullable: true
+        state:
+          type: string
+          nullable: true
+        incident_type:
+          type: string
+          nullable: true
+        incident_begin_date:
+          type: string
+          format: date-time
+          nullable: true
+        incident_end_date:
+          type: string
+          format: date-time
+          nullable: true
+        declaration_type:
+          type: string
+          nullable: true
+        programs_declared:
+          type: string
+          nullable: true
+        distance_km:
+          type: number
+          description: Distance from the query point in kilometers.
+
+    Zone:
+      type: object
+      properties:
+        flood_zone:
+          type: string
+          nullable: true
+          description: FEMA flood zone code (e.g. A, AE, VE, X, D), or null if unavailable.
+          example: AE
+        zone_subtype:
+          type: string
+          nullable: true
+        description:
+          type: string
+          description: Human-readable description of the flood zone.
+      required: [flood_zone, description]
+
+    Narrative:
+      type: object
+      properties:
+        narrative:
+          type: string
+          description: The generated narrative as an HTML fragment.
+        flood_zone:
+          type: string
+          nullable: true
+        generated_at:
+          type: string
+          format: date-time
+        cached:
+          type: boolean
+          description: Whether this narrative was served from cache.
+      required: [narrative, flood_zone, generated_at, cached]
+
+    CountyFeatureCollection:
+      type: object
+      description: GeoJSON FeatureCollection of county polygons.
+      properties:
+        type:
+          type: string
+          const: FeatureCollection
+        features:
+          type: array
+          items:
+            $ref: "#/components/schemas/CountyFeature"
+      required: [type, features]
+
+    CountyFeature:
+      type: object
+      properties:
+        type:
+          type: string
+          const: Feature
+        geometry:
+          type: object
+          description: GeoJSON geometry (Polygon or MultiPolygon).
+          additionalProperties: true
+        properties:
+          type: object
+          properties:
+            fips:
+              type: string
+            name:
+              type: string
+            state:
+              type: string
+            declarations_by_type:
+              type: object
+              description: Map of incident type to declaration count within the radius.
+              additionalProperties:
+                type: integer
+            has_declarations:
+              type: boolean
+          required: [fips, name, state, declarations_by_type, has_declarations]
+      required: [type, geometry, properties]
+
+    ValidationErrorDetail:
+      type: object
+      properties:
+        loc:
+          type: array
+          items:
+            anyOf:
+              - type: string
+              - type: integer
+        msg:
+          type: string
+        type:
+          type: string
+      required: [loc, msg, type]
+
+    HTTPValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationErrorDetail"
