@@ -1,6 +1,40 @@
+import { useEffect, useRef } from "react";
 import "../panel.css";
 
 export default function NarrativePanel({ lat, lng, narrativeHtml, narrativeMeta, loading, error, onClose }) {
+  const contentRef = useRef(null);
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+
+    function handleClick(e) {
+      const summary = e.target.closest("summary");
+      if (!summary) return;
+
+      // prevent <details> from toggling open — we're replacing it instead
+      e.preventDefault();
+
+      const details = summary.closest("details");
+      const innerUl = details?.querySelector("ul");
+      if (!details || !innerUl) return;
+
+      // <details> may be directly in a <ul> or wrapped in a <li> depending on what Claude generates
+      const directParent = details.parentElement;
+      const parentUl = directParent.tagName === "UL" ? directParent : directParent.parentElement;
+      const removeTarget = directParent.tagName === "UL" ? details : directParent;
+
+      // move remaining items into the parent list, then remove the trigger
+      [...innerUl.querySelectorAll(":scope > li")].forEach(item =>
+        parentUl.insertBefore(item, removeTarget)
+      );
+      removeTarget.remove();
+    }
+
+    el.addEventListener("click", handleClick);
+    return () => el.removeEventListener("click", handleClick);
+  }, [narrativeHtml]);
+
   return (
     <div className="narrative-panel">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -17,7 +51,9 @@ export default function NarrativePanel({ lat, lng, narrativeHtml, narrativeMeta,
       {error && <p style={{ color: "var(--color-red)" }}>{error}</p>}
 
       {narrativeHtml && (
-        <div className="narrative-content"
+        <div
+          ref={contentRef}
+          className="narrative-content"
           dangerouslySetInnerHTML={{ __html: narrativeHtml }}
         />
       )}
