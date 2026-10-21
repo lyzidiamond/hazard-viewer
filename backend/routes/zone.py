@@ -35,7 +35,8 @@ async def get_zone(
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.get(NFHL_URL, params=params)
-    except httpx.TimeoutException:
+    # covers timeouts and connection failures; FEMA's service is occasionally flaky
+    except httpx.HTTPError:
         return {"flood_zone": None, "description": "Flood zone data unavailable"}
 
     if resp.status_code != 200:
