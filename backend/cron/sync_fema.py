@@ -107,6 +107,15 @@ async def sync():
     sync_start = datetime.now(timezone.utc).isoformat() # set sync_start to now
     log.info(f"Last sync: {last_sync or 'never (full load)'}") # log the time of last sync
 
+    # rows without a fema_id were loaded before the table was keyed per county. do a full reload
+    # to replace them -- the old key kept only one county per disaster
+    with conn.cursor() as cur:
+        cur.execute("SELECT EXISTS (SELECT 1 FROM disaster_declarations WHERE fema_id IS NULL)")
+        needs_reload = cur.fetchone()[0]
+    if needs_reload:
+        log.info("Found rows from before per-county keying — doing a full reload")
+        last_sync = None
+
     records = await fetch_fema_declarations(since=last_sync) # call fetch_fema_declarations which returns a records array
     log.info(f"Fetched {len(records)} records from OpenFEMA") # log how many records were synced
 
@@ -139,6 +148,7 @@ async def sync():
 
 
         rows.append((
+            record.get("id"),
             record.get("disasterNumber"),
             record.get("state"),
             fips,
@@ -152,7 +162,7 @@ async def sync():
             geom_wkt,
         ))
 
-    # add deduplication by disaster_number before batching to avoid FEMA data duplicates
+    # add deduplication by FEMA id before batching to avoid FEMA data duplicates
     seen = {}
     for row in rows:
         seen[row[0]] = row
@@ -166,11 +176,11 @@ async def sync():
                 cur,
                 """
                 INSERT INTO disaster_declarations (
-                    disaster_number, state, county_fips, county_name,
+                    fema_id, disaster_number, state, county_fips, county_name,
                     incident_type, incident_begin_date, incident_end_date, declaration_date,
                     declaration_type, programs_declared, geom
                 ) VALUES %s
-                ON CONFLICT (disaster_number) DO UPDATE SET
+                ON CONFLICT (fema_id) DO UPDATE SET
                     incident_type       = EXCLUDED.incident_type,
                     incident_begin_date = EXCLUDED.incident_begin_date,
                     incident_end_date   = EXCLUDED.incident_end_date,
@@ -182,10 +192,18 @@ async def sync():
                     OR disaster_declarations.incident_end_date IS DISTINCT FROM EXCLUDED.incident_end_date
                 """,
                 batch,
-                template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, ST_GeomFromText(%s, 4326))",
+                template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, ST_GeomFromText(%s, 4326))",
             )
         conn.commit()
         log.info(f"Upserted batch {i // BATCH_SIZE + 1}/{-(-len(rows) // BATCH_SIZE)}")
+
+    # after a full reload, drop the old incomplete rows and invalidate every narrative built from them
+    if needs_reload:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM disaster_declarations WHERE fema_id IS NULL")
+            log.info(f"Removed {cur.rowcount} rows from before per-county keying")
+            cur.execute("UPDATE ai_narratives SET invalidated_at = NOW() WHERE invalidated_at IS NULL")
+        conn.commit()
 
     # invalidate narratives near all records in the delta
     # (all fetched records are new or modified since last sync)

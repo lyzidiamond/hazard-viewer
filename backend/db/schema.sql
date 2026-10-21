@@ -14,8 +14,10 @@ CREATE INDEX IF NOT EXISTS counties_geom_idx ON counties USING GIST(geom);
 CREATE INDEX IF NOT EXISTS counties_boundary_idx ON counties USING GIST(boundary);
 
 -- Disaster declarations (synced nightly from OpenFEMA)
+-- one row per disaster per designated area (usually a county), so a disaster_number can appear many times
 CREATE TABLE IF NOT EXISTS disaster_declarations (
-    disaster_number     INTEGER PRIMARY KEY,
+    fema_id             TEXT,
+    disaster_number     INTEGER NOT NULL,
     state               TEXT NOT NULL,
     county_fips         CHAR(5),
     county_name         TEXT,
@@ -29,6 +31,12 @@ CREATE TABLE IF NOT EXISTS disaster_declarations (
     created_at          TIMESTAMPTZ DEFAULT NOW(),
     updated_at          TIMESTAMPTZ DEFAULT NOW()
 );
+-- migration: earlier versions keyed on disaster_number, which kept only one county per disaster.
+-- rows without a fema_id are replaced by a full reload on the next sync (see sync_fema.py)
+ALTER TABLE disaster_declarations ADD COLUMN IF NOT EXISTS fema_id TEXT;
+ALTER TABLE disaster_declarations DROP CONSTRAINT IF EXISTS disaster_declarations_pkey;
+CREATE UNIQUE INDEX IF NOT EXISTS disaster_declarations_fema_id_idx ON disaster_declarations(fema_id);
+CREATE INDEX IF NOT EXISTS disaster_declarations_number_idx ON disaster_declarations(disaster_number);
 CREATE INDEX IF NOT EXISTS disaster_declarations_geom_idx ON disaster_declarations USING GIST(geom);
 CREATE INDEX IF NOT EXISTS disaster_declarations_date_idx ON disaster_declarations(incident_begin_date);
 CREATE INDEX IF NOT EXISTS disaster_declarations_type_idx ON disaster_declarations(incident_type);
