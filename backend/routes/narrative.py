@@ -86,19 +86,21 @@ async def _get_nearest_county(lat: float, lng: float) -> dict | None:
 
 # computes a risk level algorithmically from declaration counts and trend.
 # weights recent declarations (2011-present) 1.5x to reflect increasing hazard frequency.
+# thresholds are roughly the quintiles of this score across all US county centroids,
+# so each level covers about a fifth of US counties.
 def _compute_risk(declarations: list[dict], trend: dict) -> tuple[str, str] | None:
     if not declarations:
         return None
     total = len(declarations)
     recent = trend.get("2011_present", 0)
     score = (total - recent) + (recent * 1.5)
-    if score >= 50:
+    if score >= 110:
         return "Very High", "red"
-    elif score >= 30:
+    elif score >= 85:
         return "High", "red"
-    elif score >= 15:
+    elif score >= 65:
         return "Moderate", "darkorange"
-    elif score >= 5:
+    elif score >= 45:
         return "Low", "green"
     else:
         return "Very Low", "green"

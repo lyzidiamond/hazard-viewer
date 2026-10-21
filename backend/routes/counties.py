@@ -4,6 +4,7 @@ import json
 from fastapi import APIRouter, Query
 
 from db.connection import get_conn
+from routes.declarations import NON_NATURAL_TYPES
 
 router = APIRouter()
 
@@ -39,6 +40,7 @@ async def get_counties(
                 )
                 AND county_fips IS NOT NULL
                 AND incident_type IS NOT NULL
+                AND incident_type <> ALL($4::text[])
                 GROUP BY county_fips, incident_type
             ) d ON c.fips = d.county_fips
             WHERE c.boundary IS NOT NULL
@@ -49,7 +51,7 @@ async def get_counties(
             )
             GROUP BY c.fips, c.name, c.state, c.boundary
             """,
-            lat, lng, radius_m,
+            lat, lng, radius_m, NON_NATURAL_TYPES,
         )
 
     # build a GeoJSON FeatureCollection — MapLibre consumes this directly as a source
