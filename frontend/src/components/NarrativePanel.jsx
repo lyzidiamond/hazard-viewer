@@ -1,5 +1,46 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import "../panel.css";
+
+// adds a heading to the declaration list, wraps each hazard type in a collapsed <details> so long
+// lists don't push the narrative below the fold, and labels the narrative with "Summary:".
+// done client-side so cached narratives get it too.
+function formatNarrative(html) {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+
+  // only US narratives have a declaration list; non-US ones are left as-is
+  const list = doc.body.querySelector(":scope > ul");
+  if (!list) return html;
+
+  if (list.children.length) {
+    const heading = doc.createElement("h4");
+    heading.textContent = "Disaster declarations within 100 km";
+    list.before(heading);
+  }
+
+  const firstParagraph = doc.body.querySelector(":scope > p");
+  if (firstParagraph) {
+    const label = doc.createElement("strong");
+    label.textContent = "Summary: ";
+    firstParagraph.prepend(label);
+  }
+
+  list.querySelectorAll(":scope > li").forEach(li => {
+    const innerUl = li.querySelector(":scope > ul");
+    if (!innerUl) return;
+
+    const hazardType = li.firstChild?.textContent.trim() || "Unknown";
+    const count = innerUl.querySelectorAll("li:not(:has(details))").length;
+
+    const details = doc.createElement("details");
+    details.className = "hazard-group";
+    const summary = doc.createElement("summary");
+    summary.textContent = `${hazardType} (${count})`;
+    details.append(summary, innerUl);
+
+    li.replaceChildren(details);
+  });
+  return doc.body.innerHTML;
+}
 
 export default function NarrativePanel({ lat, lng, narrativeHtml, narrativeMeta, loading, error, onClose }) {
   const contentRef = useRef(null);
@@ -9,7 +50,8 @@ export default function NarrativePanel({ lat, lng, narrativeHtml, narrativeMeta,
     if (!el) return;
 
     function handleClick(e) {
-      const summary = e.target.closest("summary");
+      // only the nested "N more declarations" expanders; hazard-group accordions toggle normally
+      const summary = e.target.closest("details:not(.hazard-group) > summary");
       if (!summary) return;
 
       // prevent <details> from toggling open — we're replacing it instead
@@ -35,6 +77,11 @@ export default function NarrativePanel({ lat, lng, narrativeHtml, narrativeMeta,
     return () => el.removeEventListener("click", handleClick);
   }, [narrativeHtml]);
 
+  const displayHtml = useMemo(
+    () => (narrativeHtml ? formatNarrative(narrativeHtml) : ""),
+    [narrativeHtml]
+  );
+
   return (
     <div className="narrative-panel">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -54,7 +101,7 @@ export default function NarrativePanel({ lat, lng, narrativeHtml, narrativeMeta,
         <div
           ref={contentRef}
           className="narrative-content"
-          dangerouslySetInnerHTML={{ __html: narrativeHtml }}
+          dangerouslySetInnerHTML={{ __html: displayHtml }}
         />
       )}
 
