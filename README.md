@@ -172,3 +172,23 @@ One of the nice things about this app is how many different ways you can extend 
 3. **Additional frontend features.** There are several enhancements that can be made on the frontend side to reel users in: add a location lookup instead of just map clicks, make the layout usable on mobile, zoom to current location, etc.
 4. **Additional data sources.** FEMA maintains a National Risk Index that reflects its own risk analysis, but it doesn't have a publicly accessible API. Add logic to pull down the data, add it to the database, and use it as part of the risk context sent to Claude to help generate the narrative. Another option is to populate the `population` column in the `counties` table (currently in the table but empty) and use the data to enable per-capita risk normalization.
 5. **Fix Connecticut and future-proof against other county changes.** This is some low-hanging fruit but could be fixed by finding or creating a more-frequently-updated county boundary dataset.
+
+<!--
+TODO: README sections that are out of date
+
+- "Generating the risk assessment summary" says Claude produces the title, risk level, and declaration list. All three are now built in code in narrative.py:
+  - title uses the nearest county
+  - risk level is a weighted count, with declarations since 2011 counted 1.5x
+  - list is grouped by hazard type, 3 per type with an expander for the rest
+- Same section: Claude now writes only the <p> paragraphs and the data source link (or the title and message for non-US locations).
+- Same section: trend buckets are 1953-80, 1981-2000, 2001-10, and 2011-present, not decades.
+- "The frontend" says the app calls /narrative. It actually uses /narrative/stream and shows the text as it streams in.
+- Not mentioned anywhere: the frontend accordions, the "Disaster declarations within 100 km" heading, and the "Summary:" label.
+- "Some app weirdness": the sentence ending "instead of waiting for" is cut off.
+
+TODO: add to CHANGELOG
+
+- Fixed a data bug where only one county was stored per disaster. FEMA reports one row per disaster per county, but the table was keyed on disaster_number alone, so the sync kept one arbitrary county and dropped the rest (5,184 rows stored out of ~70,500). The table is now keyed on FEMA's per-row id, and the next sync does a one-time full reload. Nearby-declaration counts go up a lot (e.g. Houston went from 16 to 60 disasters within 100 km), so risk levels and map shading change too. The narrative now counts each disaster once, using its nearest affected county.
+- Excluded non-natural declaration types (Biological, Chemical, Terrorist, Human Cause, Toxic Substances, Fishing Losses) from the narrative and map. Biological alone was ~7,900 county rows, mostly COVID-19.
+- Recalibrated the risk thresholds to 45 / 65 / 85 / 110 (previously 5 / 15 / 30 / 50) so each risk level covers about a fifth of US counties. With the corrected data and the old thresholds, 75% of counties came out Very High.
+-->
