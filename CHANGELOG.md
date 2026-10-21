@@ -1,6 +1,6 @@
 # Changelog
 
-## 10/20/26
+## 6/30/26
 
 ### Core app logic changes
 
@@ -15,7 +15,7 @@ All Claude is doing now is generating the narrative. It uses the federal data an
 Options for the future:
 - make this app a straight up assessment/viewer for federal natural hazard data across the board. Click a place and see your flood zone, see disaster declarations, whatever other info I can get. AGOL GIS in the broswer style. No analysis, or a non-AI analysis. Can include any government documents that reference that area if they're easily searchable/available, like the RiskMAP product (I don't know what else is out there right now).
 
-### On the frontend
+## 5/29/26
 
 The disaster declarations themselves are now loaded directly in the code rather than generated via the call to Claude.
 
@@ -25,3 +25,18 @@ The disaster declarations themselves are now loaded directly in the code rather 
 - **NFHL timeout handling:** Raised timeouts from the National Flood Hazard Layer from 10 seconds to 30 seconds. Timeouts return an "unavailable" state.
 - **/narrative/stream endpoint:** Added a streaming endpoint to enable streaming text from Claude instead of waiting for the whole narrative to generate first.
 - **CSS updates:** Removed Pico CSS and added custom styling and fonts. Added a mobile layout. Map uses `fitBounds` instead of `flyTo` to ensure entire selected region is in the map frame.
+
+<!--
+TODO: changelog entries to write
+
+10/20/26 (commits bda595d through b08d242)
+- Data bug fix: FEMA reports one row per disaster per county, but the table was keyed on disaster_number, so the sync kept one arbitrary county per disaster (5,184 rows stored out of ~70,500). Now keyed on FEMA's per-row id; the next sync does a one-time full reload. Houston went from 16 to 60 disasters within 100 km. The narrative counts each disaster once, at its nearest affected county.
+- Excluded non-natural declaration types from the narrative and map: Biological, Chemical, Terrorist, Human Cause, Toxic Substances, Fishing Losses. Biological alone was ~7,900 county rows, mostly COVID-19.
+- Risk thresholds recalibrated from 50 / 30 / 15 / 5 to 110 / 85 / 65 / 45, roughly the quintiles of the score across US county centroids. With corrected data, the old thresholds put 75% of counties at Very High.
+- Frontend: each hazard type in the declaration list is a collapsed accordion with a count; the list has a "Disaster declarations within 100 km" heading; the narrative starts with a bold "Summary:".
+- NFHL connection failures now return "unavailable" like timeouts, instead of failing the whole narrative.
+- Backend pinned to Python 3.14 (backend/.python-version).
+
+6/30/26 (commit 30f7ef5)
+- Frontend: clicking "N more declarations" expands the rest of the list in place.
+-->
