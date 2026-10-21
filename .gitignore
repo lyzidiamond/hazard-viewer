@@ -7,3 +7,5 @@ PLANNING.md
 floodreport-debug-summary.md
 notes.md
 openapi.yaml
+__pycache__/
+dist/
